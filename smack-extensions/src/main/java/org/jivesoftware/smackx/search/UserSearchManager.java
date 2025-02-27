@@ -1,6 +1,6 @@
 /**
  *
- * Copyright 2003-2007 Jive Software.
+ * Copyright 2003-2007 Jive Software, 2025 Florian Schmaus.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,12 +17,15 @@
 package org.jivesoftware.smackx.search;
 
 import java.util.List;
+import java.util.Map;
+import java.util.WeakHashMap;
 
+import org.jivesoftware.smack.Manager;
 import org.jivesoftware.smack.SmackException.NoResponseException;
 import org.jivesoftware.smack.SmackException.NotConnectedException;
 import org.jivesoftware.smack.XMPPConnection;
 import org.jivesoftware.smack.XMPPException.XMPPErrorException;
-
+import org.jivesoftware.smack.packet.IQ;
 import org.jivesoftware.smackx.disco.ServiceDiscoveryManager;
 import org.jivesoftware.smackx.xdata.form.FillableForm;
 import org.jivesoftware.smackx.xdata.form.Form;
@@ -49,19 +52,25 @@ import org.jxmpp.jid.DomainBareJid;
  *
  * @author Derek DeMoro
  */
-public class UserSearchManager {
+public class UserSearchManager extends Manager {
 
-    private final XMPPConnection con;
-    private final UserSearch userSearch;
+    private static final Map<XMPPConnection, UserSearchManager> INSTANCES = new WeakHashMap<>();
 
+    public static synchronized UserSearchManager getInstanceFor(XMPPConnection connection) {
+        var userSearchManager = INSTANCES.get(connection);
+        if (userSearchManager == null) {
+            userSearchManager = new UserSearchManager(connection);
+            INSTANCES.put(connection, userSearchManager);
+        }
+        return userSearchManager;
+    }
     /**
      * Creates a new UserSearchManager.
      *
-     * @param con the XMPPConnection to use.
+     * @param connection the XMPPConnection to use.
      */
-    public UserSearchManager(XMPPConnection con) {
-        this.con = con;
-        userSearch = new UserSearch();
+    private UserSearchManager(XMPPConnection connection) {
+        super(connection);
     }
 
     /**
@@ -74,8 +83,13 @@ public class UserSearchManager {
      * @throws NotConnectedException if the XMPP connection is not connected.
      * @throws InterruptedException if the calling thread was interrupted.
      */
-    public Form getSearchForm(DomainBareJid searchService) throws NoResponseException, XMPPErrorException, NotConnectedException, InterruptedException  {
-        DataForm dataForm = userSearch.getSearchForm(con, searchService);
+    public static Form getSearchForm(XMPPConnection connection, DomainBareJid searchService) throws NoResponseException, XMPPErrorException, NotConnectedException, InterruptedException  {
+        UserSearch search = new UserSearch();
+        search.setType(IQ.Type.get);
+        search.setTo(searchService);
+
+        IQ response = connection.sendIqRequestAndWaitForResponse(search);
+        var dataForm = DataForm.from(response, UserSearch.NAMESPACE);
         return new Form(dataForm);
     }
 
@@ -91,23 +105,69 @@ public class UserSearchManager {
      * @throws NotConnectedException if the XMPP connection is not connected.
      * @throws InterruptedException if the calling thread was interrupted.
      */
-    public ReportedData getSearchResults(FillableForm searchForm, DomainBareJid searchService)
+    public ReportedData getSearchResults(XMPPConnection connection, FillableForm searchForm, DomainBareJid searchService)
                     throws NoResponseException, XMPPErrorException, NotConnectedException, InterruptedException {
         DataForm dataForm = searchForm.getDataFormToSubmit();
-        return userSearch.sendSearchForm(con, dataForm, searchService);
+        return sendSearchForm(connection, dataForm, searchService);
+    }
+
+    /**
+     * Sends the filled out answer form to be sent and queried by the search service.
+     *
+     * @param con           the current XMPPConnection.
+     * @param searchForm    the <code>Form</code> to send for querying.
+     * @param searchService the search service to use. (ex. search.jivesoftware.com)
+     * @return ReportedData the data found from the query.
+     * @throws XMPPErrorException if there was an XMPP error returned.
+     * @throws NoResponseException if there was no response from the remote entity.
+     * @throws NotConnectedException if the XMPP connection is not connected.
+     * @throws InterruptedException if the calling thread was interrupted.
+     */
+    // TODO: take FillableForm, instead of DataForm
+    public static ReportedData sendSearchForm(XMPPConnection con, DataForm searchForm, DomainBareJid searchService) throws NoResponseException, XMPPErrorException, NotConnectedException, InterruptedException {
+        UserSearch search = new UserSearch();
+        search.setType(IQ.Type.set);
+        search.setTo(searchService);
+        search.addExtension(searchForm);
+
+        IQ response = con.sendIqRequestAndWaitForResponse(search);
+        return ReportedData.getReportedDataFrom(response);
+    }
+
+    /**
+     * Sends the filled out answer form to be sent and queried by the search service.
+     *
+     * @param con           the current XMPPConnection.
+     * @param searchForm    the <code>Form</code> to send for querying.
+     * @param searchService the search service to use. (ex. search.jivesoftware.com)
+     * @return ReportedData the data found from the query.
+     * @throws XMPPErrorException if there was an XMPP error returned.
+     * @throws NoResponseException if there was no response from the remote entity.
+     * @throws NotConnectedException if the XMPP connection is not connected.
+     * @throws InterruptedException if the calling thread was interrupted.
+     */
+    public static ReportedData sendSimpleSearchForm(XMPPConnection con, DataForm searchForm, DomainBareJid searchService) throws NoResponseException, XMPPErrorException, NotConnectedException, InterruptedException {
+        SimpleUserSearch search = new SimpleUserSearch();
+        search.setForm(searchForm);
+        search.setType(IQ.Type.set);
+        search.setTo(searchService);
+
+        SimpleUserSearch response = con.sendIqRequestAndWaitForResponse(search);
+        return response.getReportedData();
     }
 
     /**
      * Returns a collection of search services found on the server.
      *
+     * @param connection the connection to query for search services.
      * @return a Collection of search services found on the server.
      * @throws XMPPErrorException if there was an XMPP error returned.
      * @throws NoResponseException if there was no response from the remote entity.
      * @throws NotConnectedException if the XMPP connection is not connected.
      * @throws InterruptedException if the calling thread was interrupted.
      */
-    public List<DomainBareJid> getSearchServices() throws NoResponseException, XMPPErrorException, NotConnectedException, InterruptedException  {
-        ServiceDiscoveryManager discoManager = ServiceDiscoveryManager.getInstanceFor(con);
-        return discoManager.findServices(UserSearch.NAMESPACE, false, false);
+    public static List<DomainBareJid> getSearchServices(XMPPConnection connection) throws NoResponseException, XMPPErrorException, NotConnectedException, InterruptedException  {
+        ServiceDiscoveryManager discoManager = ServiceDiscoveryManager.getInstanceFor(connection);
+        return discoManager.findServices(UserSearch.NAMESPACE, false, true);
     }
 }
