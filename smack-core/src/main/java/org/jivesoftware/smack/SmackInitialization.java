@@ -1,6 +1,6 @@
 /*
  *
- * Copyright 2003-2007 Jive Software, 2014-2024 Florian Schmaus
+ * Copyright 2003-2007 Jive Software, 2014-2026 Florian Schmaus
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -51,6 +51,7 @@ import org.jivesoftware.smack.sasl.core.SASLAnonymous;
 import org.jivesoftware.smack.sasl.core.SASLXOauth2Mechanism;
 import org.jivesoftware.smack.sasl.core.SCRAMSHA1Mechanism;
 import org.jivesoftware.smack.sasl.core.ScramSha1PlusMechanism;
+import org.jivesoftware.smack.sasl.sasl2.Sasl2ModuleDescriptor;
 import org.jivesoftware.smack.util.CloseableUtil;
 import org.jivesoftware.smack.util.FileUtils;
 import org.jivesoftware.smack.util.PacketParserUtils;
@@ -143,6 +144,7 @@ public final class SmackInitialization {
         ProviderManager.addNonzaProvider(FailureProvider.INSTANCE);
 
         SmackConfiguration.addModule(Bind2ModuleDescriptor.class);
+        SmackConfiguration.addModule(Sasl2ModuleDescriptor.class);
         SmackConfiguration.addModule(CompressionModuleDescriptor.class);
         SmackConfiguration.addModule(InstantStreamResumptionModuleDescriptor.class);
 

@@ -1,6 +1,6 @@
 /*
  *
- * Copyright 2019-2020 Florian Schmaus
+ * Copyright 2019-2026 Florian Schmaus
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,14 +17,14 @@
 package org.jivesoftware.smack.bind2;
 
 import org.jivesoftware.smack.c2s.ModularXmppClientToServerConnection.AuthenticatedAndResourceBoundStateDescriptor;
-import org.jivesoftware.smack.c2s.ModularXmppClientToServerConnection.ConnectedButUnauthenticatedStateDescriptor;
-import org.jivesoftware.smack.c2s.ModularXmppClientToServerConnection.SaslAuthenticationStateDescriptor;
+import org.jivesoftware.smack.c2s.ModularXmppClientToServerConnection.AuthenticatedButUnboundStateDescriptor;
 import org.jivesoftware.smack.c2s.ModularXmppClientToServerConnectionModule;
 import org.jivesoftware.smack.c2s.internal.ModularXmppClientToServerConnectionInternal;
 import org.jivesoftware.smack.c2s.internal.WalkStateGraphContext;
 import org.jivesoftware.smack.fsm.State;
 import org.jivesoftware.smack.fsm.StateDescriptor;
 import org.jivesoftware.smack.fsm.StateTransitionResult;
+import org.jivesoftware.smack.sasl.sasl2.Sasl2Module.Sasl2StateDescriptor;
 
 public class Bind2Module extends ModularXmppClientToServerConnectionModule<Bind2ModuleDescriptor> {
 
@@ -37,9 +37,9 @@ public class Bind2Module extends ModularXmppClientToServerConnectionModule<Bind2
         private Bind2StateDescriptor() {
             super(Bind2State.class, 386, StateDescriptor.Property.notImplemented);
 
-            addPredeccessor(ConnectedButUnauthenticatedStateDescriptor.class);
+            addPredeccessor(Sasl2StateDescriptor.class);
             addSuccessor(AuthenticatedAndResourceBoundStateDescriptor.class);
-            declarePrecedenceOver(SaslAuthenticationStateDescriptor.class);
+            declarePrecedenceOver(AuthenticatedButUnboundStateDescriptor.class);
         }
 
         @Override
