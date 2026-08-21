@@ -32,6 +32,14 @@ public class Sasl2ModuleDescriptor extends ModularXmppClientToServerConnectionMo
     static {
         ProviderManager.addStreamFeatureProvider(Sasl2Feature.QNAME, Sasl2Provider.Sasl2FeatureProvider.INSTANCE);
         ProviderManager.addNonzaProvider(Sasl2Provider.AuthenticateProvider.INSTANCE);
+        ProviderManager.addNonzaProvider(Sasl2Provider.ChallengeProvider.INSTANCE);
+        ProviderManager.addNonzaProvider(Sasl2Provider.ResponseProvider.INSTANCE);
+        ProviderManager.addNonzaProvider(Sasl2Provider.SuccessProvider.INSTANCE);
+        ProviderManager.addNonzaProvider(Sasl2Provider.FailureProvider.INSTANCE);
+        ProviderManager.addNonzaProvider(Sasl2Provider.AbortProvider.INSTANCE);
+        ProviderManager.addNonzaProvider(Sasl2Provider.ContinueProvider.INSTANCE);
+        ProviderManager.addNonzaProvider(Sasl2Provider.NextProvider.INSTANCE);
+        ProviderManager.addNonzaProvider(Sasl2Provider.TaskDataProvider.INSTANCE);
     }
 
     private static final Sasl2ModuleDescriptor INSTANCE = new Sasl2ModuleDescriptor();

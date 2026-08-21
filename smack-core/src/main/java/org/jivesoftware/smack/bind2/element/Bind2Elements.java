@@ -16,19 +16,24 @@
  */
 package org.jivesoftware.smack.bind2.element;
 
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 import java.util.Set;
 
 import javax.xml.namespace.QName;
 
 import org.jivesoftware.smack.packet.ExtensionElement;
+import org.jivesoftware.smack.packet.XmlElement;
 import org.jivesoftware.smack.packet.XmlEnvironment;
+import org.jivesoftware.smack.util.XmlStringBuilder;
 
 public class Bind2Elements {
 
     public static final String NAMESPACE = "urn:xmpp:bind:0";
 
     /*
-     * The same <bind/> element is used in two different contexts (sasl2 stream feature inline and sasl2 authenticate) with different requirements, which is very unfortunate.
+     * The same <bind/> element is used in two different contexts (sasl2 stream feature inline and sasl2 authenticate) with different requirements.
      */
     public static class Bind implements ExtensionElement {
         public static final String ELEMENT = "bind";
@@ -36,11 +41,16 @@ public class Bind2Elements {
 
         private final Set<String> inlineFeatures;
         private final String tag;
-        // XXX: Additional extension elements
+        private final List<XmlElement> extensionElements;
 
         public Bind(Set<String> inlineFeatures, String tag) {
-            this.inlineFeatures = inlineFeatures;
+            this(inlineFeatures, tag, null);
+        }
+
+        public Bind(Set<String> inlineFeatures, String tag, List<? extends XmlElement> extensionElements) {
+            this.inlineFeatures = inlineFeatures == null ? Collections.emptySet() : inlineFeatures;
             this.tag = tag;
+            this.extensionElements = extensionElements == null ? Collections.emptyList() : Collections.unmodifiableList(new ArrayList<>(extensionElements));
         }
 
         @Override
@@ -61,22 +71,44 @@ public class Bind2Elements {
             return tag;
         }
 
-        @Override
-        public CharSequence toXML(XmlEnvironment xmlEnvironment) {
-            // TODO Auto-generated method stub
-            return null;
+        public List<XmlElement> getExtensionElements() {
+            return extensionElements;
         }
 
+        @Override
+        public XmlStringBuilder toXML(XmlEnvironment xmlEnvironment) {
+            XmlStringBuilder xml = new XmlStringBuilder(this, xmlEnvironment);
+
+            if (inlineFeatures.isEmpty() && tag == null && extensionElements.isEmpty()) {
+                xml.closeEmptyElement();
+                return xml;
+            }
+
+            xml.rightAngleBracket();
+
+            if (!inlineFeatures.isEmpty()) {
+                xml.openElement("inline");
+                for (String feature : inlineFeatures) {
+                    xml.halfOpenElement("feature").attribute("var", feature).closeEmptyElement();
+                }
+                xml.closeElement("inline");
+            }
+
+            xml.optElement("tag", tag);
+            xml.append(extensionElements);
+
+            xml.closeElement(this);
+            return xml;
+        }
     }
 
     public static class Bound implements ExtensionElement {
         public static final String ELEMENT = "bound";
         public static final QName QNAME = new QName(NAMESPACE, ELEMENT);
-        // XXX: <metadata xmlns='urn:xmpp:mam:2'> element
 
-        public final ExtensionElement mamMetadata;
+        public final XmlElement mamMetadata;
 
-        public Bound(ExtensionElement mamMetadata) {
+        public Bound(XmlElement mamMetadata) {
             this.mamMetadata = mamMetadata;
         }
 
@@ -90,11 +122,23 @@ public class Bind2Elements {
             return NAMESPACE;
         }
 
-        @Override
-        public CharSequence toXML(XmlEnvironment xmlEnvironment) {
-            // TODO Auto-generated method stub
-            return null;
+        public XmlElement getMamMetadata() {
+            return mamMetadata;
         }
 
+        @Override
+        public XmlStringBuilder toXML(XmlEnvironment xmlEnvironment) {
+            XmlStringBuilder xml = new XmlStringBuilder(this, xmlEnvironment);
+
+            if (mamMetadata == null) {
+                xml.closeEmptyElement();
+                return xml;
+            }
+
+            xml.rightAngleBracket();
+            xml.append(mamMetadata);
+            xml.closeElement(this);
+            return xml;
+        }
     }
 }

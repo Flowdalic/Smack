@@ -16,15 +16,30 @@
  */
 package org.jivesoftware.smack.sasl.packet;
 
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+
 import javax.xml.namespace.QName;
 
+import org.jivesoftware.smack.bind2.element.Bind2Elements;
 import org.jivesoftware.smack.packet.ExtensionElement;
+import org.jivesoftware.smack.packet.XmlElement;
 import org.jivesoftware.smack.packet.XmlEnvironment;
+import org.jivesoftware.smack.util.XmlStringBuilder;
 
 public class Sasl2Feature implements ExtensionElement {
-    public static final String ELEMENT = "autentication";
+    public static final String ELEMENT = "authentication";
     public static final String NAMESPACE = Sasl2Nonza.NAMESPACE;
     public static final QName QNAME = new QName(NAMESPACE, ELEMENT);
+
+    private final List<String> mechanisms;
+    private final List<XmlElement> inlineFeatures;
+
+    public Sasl2Feature(List<String> mechanisms, List<? extends XmlElement> inlineFeatures) {
+        this.mechanisms = mechanisms == null ? Collections.emptyList() : Collections.unmodifiableList(new ArrayList<>(mechanisms));
+        this.inlineFeatures = inlineFeatures == null ? Collections.emptyList() : Collections.unmodifiableList(new ArrayList<>(inlineFeatures));
+    }
 
     @Override
     public String getElementName() {
@@ -36,14 +51,47 @@ public class Sasl2Feature implements ExtensionElement {
         return NAMESPACE;
     }
 
+    public List<String> getMechanisms() {
+        return mechanisms;
+    }
+
+    public List<XmlElement> getInlineFeatures() {
+        return inlineFeatures;
+    }
+
     public boolean hasBind2() {
-        throw new UnsupportedOperationException("Not implemented yet");
+        for (XmlElement feature : inlineFeatures) {
+            if (Bind2Elements.Bind.QNAME.equals(feature.getQName())
+                || (Bind2Elements.Bind.ELEMENT.equals(feature.getElementName()) && Bind2Elements.NAMESPACE.equals(feature.getNamespace()))) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    public Bind2Elements.Bind getBind2Feature() {
+        for (XmlElement feature : inlineFeatures) {
+            if (feature instanceof Bind2Elements.Bind) {
+                return (Bind2Elements.Bind) feature;
+            }
+        }
+        return null;
     }
 
     @Override
-    public CharSequence toXML(XmlEnvironment xmlEnvironment) {
-        // TODO Auto-generated method stub
-        throw new UnsupportedOperationException("Not implemented yet");
+    public XmlStringBuilder toXML(XmlEnvironment xmlEnvironment) {
+        XmlStringBuilder xml = new XmlStringBuilder(this, xmlEnvironment);
+        xml.rightAngleBracket();
+        for (String mechanism : mechanisms) {
+            xml.element("mechanism", mechanism);
+        }
+        if (!inlineFeatures.isEmpty()) {
+            xml.openElement("inline");
+            xml.append(inlineFeatures);
+            xml.closeElement("inline");
+        }
+        xml.closeElement(this);
+        return xml;
     }
 
 }
