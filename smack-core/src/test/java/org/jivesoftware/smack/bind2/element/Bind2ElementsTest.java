@@ -18,9 +18,9 @@ package org.jivesoftware.smack.bind2.element;
 
 import static org.jivesoftware.smack.test.util.XmlAssertUtil.assertXmlSimilar;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.Arrays;
@@ -32,11 +32,13 @@ import org.jivesoftware.smack.bind2.Bind2ModuleDescriptor;
 import org.jivesoftware.smack.bind2.provider.Bind2Provider;
 import org.jivesoftware.smack.packet.StandardExtensionElement;
 import org.jivesoftware.smack.packet.XmlEnvironment;
-import org.jivesoftware.smack.util.PacketParserUtils;
+import org.jivesoftware.smack.test.util.SmackTestUtil;
 import org.jivesoftware.smack.xml.XmlPullParser;
 
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 
 public class Bind2ElementsTest {
 
@@ -85,10 +87,11 @@ public class Bind2ElementsTest {
         assertXmlSimilar("<bind xmlns='urn:xmpp:bind:0'/>", xml);
     }
 
-    @Test
-    public void testBindParsing() throws Exception {
+    @ParameterizedTest
+    @EnumSource(SmackTestUtil.XmlPullParserKind.class)
+    public void testBindParsing(SmackTestUtil.XmlPullParserKind parserKind) throws Exception {
         String xml = "<bind xmlns='urn:xmpp:bind:0'><tag>AwesomeXMPP</tag></bind>";
-        XmlPullParser parser = PacketParserUtils.getParserFor(xml);
+        XmlPullParser parser = SmackTestUtil.getParserFor(xml, parserKind);
         Bind2Elements.Bind bind = Bind2Provider.BindProvider.INSTANCE.parse(
             parser,
             parser.getDepth(),
@@ -101,10 +104,11 @@ public class Bind2ElementsTest {
         assertTrue(bind.getExtensionElements().isEmpty());
     }
 
-    @Test
-    public void testBindInlineParsing() throws Exception {
+    @ParameterizedTest
+    @EnumSource(SmackTestUtil.XmlPullParserKind.class)
+    public void testBindInlineParsing(SmackTestUtil.XmlPullParserKind parserKind) throws Exception {
         String xml = "<bind xmlns='urn:xmpp:bind:0'><inline><feature var='urn:xmpp:carbons:2'/><feature var='urn:xmpp:csi:0'/></inline></bind>";
-        XmlPullParser parser = PacketParserUtils.getParserFor(xml);
+        XmlPullParser parser = SmackTestUtil.getParserFor(xml, parserKind);
         Bind2Elements.Bind bind = Bind2Provider.BindProvider.INSTANCE.parse(
             parser,
             parser.getDepth(),
@@ -124,27 +128,23 @@ public class Bind2ElementsTest {
         StandardExtensionElement dummyElement = StandardExtensionElement.builder("x", "urn:test").build();
 
         Bind2Elements.Bind bind = new Bind2Elements.Bind(
-            Collections.singleton("urn:xmpp:carbons:2"),
             "AwesomeXMPP",
             Collections.singletonList(dummyElement)
         );
         String xml = bind.toXML(XmlEnvironment.EMPTY).toString();
-        assertXmlSimilar("<bind xmlns='urn:xmpp:bind:0'><inline><feature var='urn:xmpp:carbons:2'/></inline><tag>AwesomeXMPP</tag><x xmlns='urn:test'/></bind>", xml);
+        assertXmlSimilar("<bind xmlns='urn:xmpp:bind:0'><tag>AwesomeXMPP</tag><x xmlns='urn:test'/></bind>", xml);
     }
 
-    @Test
-    public void testBindParsingWithBoth() throws Exception {
+    @ParameterizedTest
+    @EnumSource(SmackTestUtil.XmlPullParserKind.class)
+    public void testBindParsingWithBoth(SmackTestUtil.XmlPullParserKind parserKind) throws Exception {
         String xml = "<bind xmlns='urn:xmpp:bind:0'><inline><feature var='urn:xmpp:carbons:2'/></inline><tag>AwesomeXMPP</tag><x xmlns='urn:test'/></bind>";
-        XmlPullParser parser = PacketParserUtils.getParserFor(xml);
-        Bind2Elements.Bind bind = Bind2Provider.BindProvider.INSTANCE.parse(
-            parser, parser.getDepth(), XmlEnvironment.EMPTY, null
+        XmlPullParser parser = SmackTestUtil.getParserFor(xml, parserKind);
+        assertThrows(IllegalArgumentException.class, () ->
+            Bind2Provider.BindProvider.INSTANCE.parse(
+                parser, parser.getDepth(), XmlEnvironment.EMPTY, null
+            )
         );
-        assertEquals("AwesomeXMPP", bind.getTag());
-        assertFalse(bind.getInlineFeatures().isEmpty());
-        assertTrue(bind.getInlineFeatures().contains("urn:xmpp:carbons:2"));
-        assertEquals(1, bind.getExtensionElements().size());
-        assertEquals("x", bind.getExtensionElements().get(0).getElementName());
-        assertEquals("urn:test", bind.getExtensionElements().get(0).getNamespace());
     }
 
     @Test
@@ -163,10 +163,11 @@ public class Bind2ElementsTest {
         assertXmlSimilar("<bound xmlns='urn:xmpp:bind:0'/>", xml);
     }
 
-    @Test
-    public void testBoundParsing() throws Exception {
+    @ParameterizedTest
+    @EnumSource(SmackTestUtil.XmlPullParserKind.class)
+    public void testBoundParsing(SmackTestUtil.XmlPullParserKind parserKind) throws Exception {
         String xml = "<bound xmlns='urn:xmpp:bind:0'><metadata xmlns='urn:xmpp:mam:2'><start id='alpha' timestamp='2020-01-01T00:00:00Z'/></metadata></bound>";
-        XmlPullParser parser = PacketParserUtils.getParserFor(xml);
+        XmlPullParser parser = SmackTestUtil.getParserFor(xml, parserKind);
         Bind2Elements.Bound bound = Bind2Provider.BoundProvider.INSTANCE.parse(
             parser, parser.getDepth(), XmlEnvironment.EMPTY, null
         );
@@ -176,10 +177,11 @@ public class Bind2ElementsTest {
         assertEquals("urn:xmpp:mam:2", bound.getMamMetadata().getNamespace());
     }
 
-    @Test
-    public void testEmptyBoundParsing() throws Exception {
+    @ParameterizedTest
+    @EnumSource(SmackTestUtil.XmlPullParserKind.class)
+    public void testEmptyBoundParsing(SmackTestUtil.XmlPullParserKind parserKind) throws Exception {
         String xml = "<bound xmlns='urn:xmpp:bind:0'/>";
-        XmlPullParser parser = PacketParserUtils.getParserFor(xml);
+        XmlPullParser parser = SmackTestUtil.getParserFor(xml, parserKind);
         Bind2Elements.Bound bound = Bind2Provider.BoundProvider.INSTANCE.parse(
             parser, parser.getDepth(), XmlEnvironment.EMPTY, null
         );

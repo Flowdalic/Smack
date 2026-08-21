@@ -26,6 +26,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.Predicate;
 import java.util.logging.Logger;
 
 import javax.net.ssl.SSLSession;
@@ -312,14 +313,21 @@ public final class SASLAuthentication {
         return lastUsedMech.getName();
     }
 
-    private SASLMechanism selectMechanism(EntityBareJid authzid, String password) throws SmackException.SmackSaslException {
-        final boolean passwordAvailable = StringUtils.isNotEmpty(password);
-
-        Iterator<SASLMechanism> it = REGISTERED_MECHANISMS.iterator();
+    private SASLMechanism selectMechanism(EntityBareJid authzid, String password)
+                    throws SmackException.SmackSaslException {
         final List<String> serverMechanisms = getServerMechanisms();
         if (serverMechanisms.isEmpty()) {
             LOGGER.warning("Server did not report any SASL mechanisms");
         }
+        return selectMechanism(authzid, password, serverMechanisms, connection, configuration, (mech) -> false);
+    }
+
+    public static SASLMechanism selectMechanism(EntityBareJid authzid, String password, List<String> serverMechanisms,
+                    AbstractXMPPConnection connection, ConnectionConfiguration configuration, Predicate<String> skipMechPredicate)
+                    throws SmackException.SmackSaslException {
+        final boolean passwordAvailable = StringUtils.isNotEmpty(password);
+
+        Iterator<SASLMechanism> it = REGISTERED_MECHANISMS.iterator();
 
         List<String> skipReasons = new ArrayList<>();
 
@@ -329,6 +337,10 @@ public final class SASLAuthentication {
             String mechanismName = mechanism.getName();
 
             if (!serverMechanisms.contains(mechanismName)) {
+                continue;
+            }
+
+            if (skipMechPredicate.test(mechanismName)) {
                 continue;
             }
 

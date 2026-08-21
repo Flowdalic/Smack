@@ -34,11 +34,13 @@ import org.jivesoftware.smack.packet.StandardExtensionElement;
 import org.jivesoftware.smack.packet.XmlEnvironment;
 import org.jivesoftware.smack.sasl.SASLError;
 import org.jivesoftware.smack.sasl.sasl2.Sasl2ModuleDescriptor;
-import org.jivesoftware.smack.util.PacketParserUtils;
+import org.jivesoftware.smack.test.util.SmackTestUtil;
 import org.jivesoftware.smack.xml.XmlPullParser;
 
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 
 public class Sasl2ElementsTest {
 
@@ -60,8 +62,9 @@ public class Sasl2ElementsTest {
         assertFalse(feature.hasBind2());
     }
 
-    @Test
-    public void testSasl2FeatureWithInlineSerializationAndParsing() throws Exception {
+    @ParameterizedTest
+    @EnumSource(SmackTestUtil.XmlPullParserKind.class)
+    public void testSasl2FeatureWithInlineSerializationAndParsing(SmackTestUtil.XmlPullParserKind parserKind) throws Exception {
         Bind2Elements.Bind bindFeature = new Bind2Elements.Bind(
             Collections.singleton("urn:xmpp:carbons:2"), null, Collections.emptyList()
         );
@@ -74,7 +77,7 @@ public class Sasl2ElementsTest {
         assertXmlSimilar("<authentication xmlns='urn:xmpp:sasl:2'><mechanism>SCRAM-SHA-1-PLUS</mechanism><mechanism>SCRAM-SHA-1</mechanism><inline><bind xmlns='urn:xmpp:bind:0'><inline><feature var='urn:xmpp:carbons:2'/></inline></bind></inline></authentication>", xml);
         assertTrue(feature.hasBind2());
 
-        XmlPullParser parser = PacketParserUtils.getParserFor(xml);
+        XmlPullParser parser = SmackTestUtil.getParserFor(xml, parserKind);
         Sasl2Feature parsed = Sasl2Provider.Sasl2FeatureProvider.INSTANCE.parse(
             parser, parser.getDepth(), XmlEnvironment.EMPTY, null
         );
@@ -94,8 +97,9 @@ public class Sasl2ElementsTest {
         assertXmlSimilar("<authenticate xmlns='urn:xmpp:sasl:2' mechanism='PLAIN'><initial-response>initial-data-here</initial-response><user-agent id='some-uuid'><software>AwesomeXMPP</software><device>Smartphone</device></user-agent></authenticate>", xml);
     }
 
-    @Test
-    public void testAuthenticateWithBind2SerializationAndParsing() throws Exception {
+    @ParameterizedTest
+    @EnumSource(SmackTestUtil.XmlPullParserKind.class)
+    public void testAuthenticateWithBind2SerializationAndParsing(SmackTestUtil.XmlPullParserKind parserKind) throws Exception {
         Sasl2Nonza.UserAgent ua = new Sasl2Nonza.UserAgent("some-uuid", "AwesomeXMPP", null);
         Bind2Elements.Bind bind = new Bind2Elements.Bind(null, "AwesomeXMPP", Collections.emptyList());
         Sasl2Nonza.Authenticate auth = new Sasl2Nonza.Authenticate("SCRAM-SHA-1", "initial-data", ua, Collections.singletonList(bind));
@@ -103,7 +107,7 @@ public class Sasl2ElementsTest {
         String xml = auth.toXML(XmlEnvironment.EMPTY).toString();
         assertXmlSimilar("<authenticate xmlns='urn:xmpp:sasl:2' mechanism='SCRAM-SHA-1'><initial-response>initial-data</initial-response><user-agent id='some-uuid'><software>AwesomeXMPP</software></user-agent><bind xmlns='urn:xmpp:bind:0'><tag>AwesomeXMPP</tag></bind></authenticate>", xml);
 
-        XmlPullParser parser = PacketParserUtils.getParserFor(xml);
+        XmlPullParser parser = SmackTestUtil.getParserFor(xml, parserKind);
         Sasl2Nonza.Authenticate parsed = Sasl2Provider.AuthenticateProvider.INSTANCE.parse(
             parser, parser.getDepth(), XmlEnvironment.EMPTY, null
         );
@@ -119,34 +123,37 @@ public class Sasl2ElementsTest {
         assertEquals("AwesomeXMPP", parsedBind.getTag());
     }
 
-    @Test
-    public void testChallengeSerializationAndParsing() throws Exception {
+    @ParameterizedTest
+    @EnumSource(SmackTestUtil.XmlPullParserKind.class)
+    public void testChallengeSerializationAndParsing(SmackTestUtil.XmlPullParserKind parserKind) throws Exception {
         Sasl2Nonza.Challenge challenge = new Sasl2Nonza.Challenge("c29tZS1jaGFsbGVuZ2U=");
         String xml = challenge.toXML(XmlEnvironment.EMPTY).toString();
         assertXmlSimilar("<challenge xmlns='urn:xmpp:sasl:2'>c29tZS1jaGFsbGVuZ2U=</challenge>", xml);
 
-        XmlPullParser parser = PacketParserUtils.getParserFor(xml);
+        XmlPullParser parser = SmackTestUtil.getParserFor(xml, parserKind);
         Sasl2Nonza.Challenge parsed = Sasl2Provider.ChallengeProvider.INSTANCE.parse(
             parser, parser.getDepth(), XmlEnvironment.EMPTY, null
         );
         assertEquals("c29tZS1jaGFsbGVuZ2U=", parsed.getData());
     }
 
-    @Test
-    public void testResponseSerializationAndParsing() throws Exception {
+    @ParameterizedTest
+    @EnumSource(SmackTestUtil.XmlPullParserKind.class)
+    public void testResponseSerializationAndParsing(SmackTestUtil.XmlPullParserKind parserKind) throws Exception {
         Sasl2Nonza.Response response = new Sasl2Nonza.Response("c29tZS1yZXNwb25zZQ==");
         String xml = response.toXML(XmlEnvironment.EMPTY).toString();
         assertXmlSimilar("<response xmlns='urn:xmpp:sasl:2'>c29tZS1yZXNwb25zZQ==</response>", xml);
 
-        XmlPullParser parser = PacketParserUtils.getParserFor(xml);
+        XmlPullParser parser = SmackTestUtil.getParserFor(xml, parserKind);
         Sasl2Nonza.Response parsed = Sasl2Provider.ResponseProvider.INSTANCE.parse(
             parser, parser.getDepth(), XmlEnvironment.EMPTY, null
         );
         assertEquals("c29tZS1yZXNwb25zZQ==", parsed.getData());
     }
 
-    @Test
-    public void testSuccessSerializationAndParsing() throws Exception {
+    @ParameterizedTest
+    @EnumSource(SmackTestUtil.XmlPullParserKind.class)
+    public void testSuccessSerializationAndParsing(SmackTestUtil.XmlPullParserKind parserKind) throws Exception {
         Bind2Elements.Bound bound = new Bind2Elements.Bound(null);
         Sasl2Nonza.Success success = new Sasl2Nonza.Success(
             "YWRkaXRpb25hbA==", "user@example.com/AwesomeXMPP.1234", Collections.singletonList(bound)
@@ -155,7 +162,7 @@ public class Sasl2ElementsTest {
         String xml = success.toXML(XmlEnvironment.EMPTY).toString();
         assertXmlSimilar("<success xmlns='urn:xmpp:sasl:2'><additional-data>YWRkaXRpb25hbA==</additional-data><authorization-identifier>user@example.com/AwesomeXMPP.1234</authorization-identifier><bound xmlns='urn:xmpp:bind:0'/></success>", xml);
 
-        XmlPullParser parser = PacketParserUtils.getParserFor(xml);
+        XmlPullParser parser = SmackTestUtil.getParserFor(xml, parserKind);
         Sasl2Nonza.Success parsed = Sasl2Provider.SuccessProvider.INSTANCE.parse(
             parser, parser.getDepth(), XmlEnvironment.EMPTY, null
         );
@@ -165,8 +172,9 @@ public class Sasl2ElementsTest {
         assertTrue(parsed.getExtensionElements().get(0) instanceof Bind2Elements.Bound);
     }
 
-    @Test
-    public void testFailureSerializationAndParsing() throws Exception {
+    @ParameterizedTest
+    @EnumSource(SmackTestUtil.XmlPullParserKind.class)
+    public void testFailureSerializationAndParsing(SmackTestUtil.XmlPullParserKind parserKind) throws Exception {
         Map<String, String> descriptiveTexts = new HashMap<>();
         descriptiveTexts.put("", "Invalid credentials");
         StandardExtensionElement appSpecific = StandardExtensionElement.builder("optional-app", "urn:custom:error").build();
@@ -178,7 +186,7 @@ public class Sasl2ElementsTest {
         String xml = failure.toXML(XmlEnvironment.EMPTY).toString();
         assertXmlSimilar("<failure xmlns='urn:xmpp:sasl:2'><not-authorized xmlns='urn:ietf:params:xml:ns:xmpp-sasl'/><text>Invalid credentials</text><optional-app xmlns='urn:custom:error'/></failure>", xml);
 
-        XmlPullParser parser = PacketParserUtils.getParserFor(xml);
+        XmlPullParser parser = SmackTestUtil.getParserFor(xml, parserKind);
         Sasl2Nonza.Failure parsed = Sasl2Provider.FailureProvider.INSTANCE.parse(
             parser, parser.getDepth(), XmlEnvironment.EMPTY, null
         );
@@ -189,8 +197,9 @@ public class Sasl2ElementsTest {
         assertEquals("optional-app", parsed.getExtensionElements().get(0).getElementName());
     }
 
-    @Test
-    public void testContinueSerializationAndParsing() throws Exception {
+    @ParameterizedTest
+    @EnumSource(SmackTestUtil.XmlPullParserKind.class)
+    public void testContinueSerializationAndParsing(SmackTestUtil.XmlPullParserKind parserKind) throws Exception {
         Sasl2Nonza.Continue continueElement = new Sasl2Nonza.Continue(
             "QWRkaXRpb25hbA==", Arrays.asList("TOTP", "UNREALISTIC-2FA"), "This account requires 2FA"
         );
@@ -198,7 +207,7 @@ public class Sasl2ElementsTest {
         String xml = continueElement.toXML(XmlEnvironment.EMPTY).toString();
         assertXmlSimilar("<continue xmlns='urn:xmpp:sasl:2'><additional-data>QWRkaXRpb25hbA==</additional-data><tasks><task>TOTP</task><task>UNREALISTIC-2FA</task></tasks><text>This account requires 2FA</text></continue>", xml);
 
-        XmlPullParser parser = PacketParserUtils.getParserFor(xml);
+        XmlPullParser parser = SmackTestUtil.getParserFor(xml, parserKind);
         Sasl2Nonza.Continue parsed = Sasl2Provider.ContinueProvider.INSTANCE.parse(
             parser, parser.getDepth(), XmlEnvironment.EMPTY, null
         );
@@ -209,8 +218,9 @@ public class Sasl2ElementsTest {
         assertEquals("This account requires 2FA", parsed.getText());
     }
 
-    @Test
-    public void testNextSerializationAndParsing() throws Exception {
+    @ParameterizedTest
+    @EnumSource(SmackTestUtil.XmlPullParserKind.class)
+    public void testNextSerializationAndParsing(SmackTestUtil.XmlPullParserKind parserKind) throws Exception {
         StandardExtensionElement params = StandardExtensionElement.builder("parameters", "urn:example:totp")
             .setText("123456")
             .build();
@@ -219,7 +229,7 @@ public class Sasl2ElementsTest {
         String xml = next.toXML(XmlEnvironment.EMPTY).toString();
         assertXmlSimilar("<next xmlns='urn:xmpp:sasl:2' task='TOTP'><parameters xmlns='urn:example:totp'>123456</parameters></next>", xml);
 
-        XmlPullParser parser = PacketParserUtils.getParserFor(xml);
+        XmlPullParser parser = SmackTestUtil.getParserFor(xml, parserKind);
         Sasl2Nonza.Next parsed = Sasl2Provider.NextProvider.INSTANCE.parse(
             parser, parser.getDepth(), XmlEnvironment.EMPTY, null
         );
@@ -228,8 +238,9 @@ public class Sasl2ElementsTest {
         assertEquals("parameters", parsed.getExtensionElements().get(0).getElementName());
     }
 
-    @Test
-    public void testTaskDataSerializationAndParsing() throws Exception {
+    @ParameterizedTest
+    @EnumSource(SmackTestUtil.XmlPullParserKind.class)
+    public void testTaskDataSerializationAndParsing(SmackTestUtil.XmlPullParserKind parserKind) throws Exception {
         StandardExtensionElement question = StandardExtensionElement.builder("question", "urn:example:2fa")
             .setText("prompt-data")
             .build();
@@ -238,7 +249,7 @@ public class Sasl2ElementsTest {
         String xml = taskData.toXML(XmlEnvironment.EMPTY).toString();
         assertXmlSimilar("<task-data xmlns='urn:xmpp:sasl:2'><question xmlns='urn:example:2fa'>prompt-data</question></task-data>", xml);
 
-        XmlPullParser parser = PacketParserUtils.getParserFor(xml);
+        XmlPullParser parser = SmackTestUtil.getParserFor(xml, parserKind);
         Sasl2Nonza.TaskData parsed = Sasl2Provider.TaskDataProvider.INSTANCE.parse(
             parser, parser.getDepth(), XmlEnvironment.EMPTY, null
         );
@@ -246,28 +257,30 @@ public class Sasl2ElementsTest {
         assertEquals("question", parsed.getExtensionElements().get(0).getElementName());
     }
 
-    @Test
-    public void testAbortSerializationAndParsing() throws Exception {
+    @ParameterizedTest
+    @EnumSource(SmackTestUtil.XmlPullParserKind.class)
+    public void testAbortSerializationAndParsing(SmackTestUtil.XmlPullParserKind parserKind) throws Exception {
         Sasl2Nonza.Abort abort = new Sasl2Nonza.Abort("User canceled authentication");
 
         String xml = abort.toXML(XmlEnvironment.EMPTY).toString();
         assertXmlSimilar("<abort xmlns='urn:xmpp:sasl:2'><text>User canceled authentication</text></abort>", xml);
 
-        XmlPullParser parser = PacketParserUtils.getParserFor(xml);
+        XmlPullParser parser = SmackTestUtil.getParserFor(xml, parserKind);
         Sasl2Nonza.Abort parsed = Sasl2Provider.AbortProvider.INSTANCE.parse(
             parser, parser.getDepth(), XmlEnvironment.EMPTY, null
         );
         assertEquals("User canceled authentication", parsed.getText());
     }
 
-    @Test
-    public void testEmptyAbortSerializationAndParsing() throws Exception {
+    @ParameterizedTest
+    @EnumSource(SmackTestUtil.XmlPullParserKind.class)
+    public void testEmptyAbortSerializationAndParsing(SmackTestUtil.XmlPullParserKind parserKind) throws Exception {
         Sasl2Nonza.Abort abort = new Sasl2Nonza.Abort();
 
         String xml = abort.toXML(XmlEnvironment.EMPTY).toString();
         assertXmlSimilar("<abort xmlns='urn:xmpp:sasl:2'/>", xml);
 
-        XmlPullParser parser = PacketParserUtils.getParserFor(xml);
+        XmlPullParser parser = SmackTestUtil.getParserFor(xml, parserKind);
         Sasl2Nonza.Abort parsed = Sasl2Provider.AbortProvider.INSTANCE.parse(
             parser, parser.getDepth(), XmlEnvironment.EMPTY, null
         );

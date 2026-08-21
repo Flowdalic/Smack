@@ -24,6 +24,7 @@ import org.jivesoftware.smack.c2s.internal.WalkStateGraphContext;
 import org.jivesoftware.smack.fsm.State;
 import org.jivesoftware.smack.fsm.StateDescriptor;
 import org.jivesoftware.smack.fsm.StateTransitionResult;
+import org.jivesoftware.smack.sasl.packet.Sasl2Feature;
 import org.jivesoftware.smack.sasl.sasl2.Sasl2Module.Sasl2StateDescriptor;
 
 public class Bind2Module extends ModularXmppClientToServerConnectionModule<Bind2ModuleDescriptor> {
@@ -52,6 +53,8 @@ public class Bind2Module extends ModularXmppClientToServerConnectionModule<Bind2
 
     private static final class Bind2State extends State {
 
+        private Sasl2Feature sasl2Feature;
+
         private Bind2State(Bind2StateDescriptor bind2StateDescriptor,
                         ModularXmppClientToServerConnectionInternal connectionInternal) {
             super(bind2StateDescriptor, connectionInternal);
@@ -59,12 +62,30 @@ public class Bind2Module extends ModularXmppClientToServerConnectionModule<Bind2
 
         @Override
         public StateTransitionResult.TransitionImpossible isTransitionToPossible(WalkStateGraphContext walkStateGraphContext) {
-            return new StateTransitionResult.TransitionImpossibleBecauseNotImplemented(stateDescriptor);
+            // sasl2Feature must always be non-null, because we can only reach the bind2 state via sasl2
+            sasl2Feature = connectionInternal.connection.getFeature(Sasl2Feature.class);
+
+            if (sasl2Feature.hasBind2())
+                // We can enter this state.
+                return null;
+
+            return new StateTransitionResult.TransitionImpossibleReason("Bind 2 not announced by service");
         }
 
         @Override
         public StateTransitionResult.AttemptResult transitionInto(WalkStateGraphContext walkStateGraphContext) {
-            throw new IllegalStateException("Bind2 not implemented");
+            // connectionInternal.prepareToWaitForFeaturesReceived();
+
+            // var loginContext = walkStateGraphContext.getLoginContext();
+            // SASLMechanism usedSaslMechanism = authenticate(loginContext.username, loginContext.password,
+            //                config.getAuthzid(), getSSLSession());
+            // authenticate() will only return if the SASL authentication was successful, but we also need to wait for
+            // the next round of stream features.
+
+            // waitForFeaturesReceived("server stream features after SASL authentication");
+
+            // return new SaslAuthenticationSuccessResult(usedSaslMechanism);
+            return null;
         }
 
     }

@@ -75,6 +75,7 @@ public class Sasl2Module extends ModularXmppClientToServerConnectionModule<Sasl2
         @Override
         public StateTransitionResult.AttemptResult transitionInto(WalkStateGraphContext walkStateGraphContext) {
             if (!sasl2Feature.hasBind2()) {
+                // XXX: Here we need to perform just SASL2 exchange and not Bind2, leading to AutehnticatedButUnbound.
                 return new StateTransitionResult.Failure("SASL 2 currently requires Bind 2");
             }
 

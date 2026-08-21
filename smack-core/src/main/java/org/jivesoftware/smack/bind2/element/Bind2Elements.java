@@ -43,14 +43,26 @@ public class Bind2Elements {
         private final String tag;
         private final List<XmlElement> extensionElements;
 
-        public Bind(Set<String> inlineFeatures, String tag) {
-            this(inlineFeatures, tag, null);
+        public Bind(Set<String> inlineFeatures) {
+            this(inlineFeatures, null, null);
+        }
+
+        public Bind(String tag, List<? extends XmlElement> extensionElements) {
+            this(null, tag, extensionElements);
         }
 
         public Bind(Set<String> inlineFeatures, String tag, List<? extends XmlElement> extensionElements) {
-            this.inlineFeatures = inlineFeatures == null ? Collections.emptySet() : inlineFeatures;
+            this.inlineFeatures = inlineFeatures == null ? Collections.emptySet() : Collections.unmodifiableSet(inlineFeatures);
             this.tag = tag;
             this.extensionElements = extensionElements == null ? Collections.emptyList() : Collections.unmodifiableList(new ArrayList<>(extensionElements));
+
+            if (!this.inlineFeatures.isEmpty()) {
+                if (tag != null)
+                    throw new IllegalArgumentException("Can't have tag and inline features set");
+
+                if (!this.extensionElements.isEmpty())
+                    throw new IllegalArgumentException("Can't have extension elements and inline features set");
+            }
         }
 
         @Override
