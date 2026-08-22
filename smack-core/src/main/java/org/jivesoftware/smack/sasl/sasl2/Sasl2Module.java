@@ -21,7 +21,6 @@ import java.io.IOException;
 import org.jivesoftware.smack.SmackException;
 import org.jivesoftware.smack.XMPPException;
 import org.jivesoftware.smack.bind2.Bind2Module;
-import org.jivesoftware.smack.bind2.Bind2Module.Bind2StateDescriptor;
 import org.jivesoftware.smack.bind2.Bind2ModuleDescriptor;
 import org.jivesoftware.smack.bind2.element.Bind2Elements;
 import org.jivesoftware.smack.c2s.ModularXmppClientToServerConnection.AuthenticatedButUnboundStateDescriptor;
@@ -55,7 +54,6 @@ public class Sasl2Module extends ModularXmppClientToServerConnectionModule<Sasl2
             super(Sasl2State.class, 388);
 
             addPredeccessor(ConnectedButUnauthenticatedStateDescriptor.class);
-            addSuccessor(Bind2StateDescriptor.class);
             addSuccessor(AuthenticatedButUnboundStateDescriptor.class);
             declarePrecedenceOver(SaslAuthenticationStateDescriptor.class);
         }

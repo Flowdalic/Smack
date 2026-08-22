@@ -25,7 +25,6 @@ import org.jivesoftware.smack.c2s.internal.WalkStateGraphContext;
 import org.jivesoftware.smack.fsm.State;
 import org.jivesoftware.smack.fsm.StateDescriptor;
 import org.jivesoftware.smack.fsm.StateTransitionResult;
-import org.jivesoftware.smack.sasl.packet.Sasl2Feature;
 import org.jivesoftware.smack.sasl.sasl2.Sasl2Authentication.Sasl2AuthenticationResult;
 import org.jivesoftware.smack.sasl.sasl2.Sasl2Module;
 import org.jivesoftware.smack.sasl.sasl2.Sasl2Module.Sasl2StateDescriptor;
@@ -65,8 +64,6 @@ public class Bind2Module extends ModularXmppClientToServerConnectionModule<Bind2
 
     private static final class Bind2State extends State {
 
-        private Sasl2Feature sasl2Feature;
-
         private Bind2State(Bind2StateDescriptor bind2StateDescriptor,
                         ModularXmppClientToServerConnectionInternal connectionInternal) {
             super(bind2StateDescriptor, connectionInternal);
@@ -74,14 +71,21 @@ public class Bind2Module extends ModularXmppClientToServerConnectionModule<Bind2
 
         @Override
         public StateTransitionResult.TransitionImpossible isTransitionToPossible(WalkStateGraphContext walkStateGraphContext) {
-            // sasl2Feature must always be non-null, because we can only reach the bind2 state via sasl2
-            sasl2Feature = connectionInternal.connection.getFeature(Sasl2Feature.class);
-
-            if (sasl2Feature != null && sasl2Feature.hasBind2()) {
-                return null;
+            Sasl2Module sasl2Module = connectionInternal.connection.getConnectionModuleFor(Sasl2ModuleDescriptor.class);
+            if (sasl2Module == null) {
+                return new StateTransitionResult.TransitionImpossibleReason("SASL 2 module not found on connection");
             }
 
-            return new StateTransitionResult.TransitionImpossibleReason("Bind 2 not announced by service");
+            Sasl2AuthenticationResult result = sasl2Module.getSasl2AuthenticationResult();
+            if (result == null) {
+                return new StateTransitionResult.TransitionImpossibleReason("SASL 2 authentication has not yielded a result");
+            }
+
+            if (!result.isResourceBound()) {
+                return new StateTransitionResult.TransitionImpossibleReason("Bind 2 was not performed during SASL 2 authentication");
+            }
+
+            return null;
         }
 
         @Override
@@ -112,7 +116,6 @@ public class Bind2Module extends ModularXmppClientToServerConnectionModule<Bind2
 
         @Override
         public void resetState() {
-            sasl2Feature = null;
             Bind2Module bind2Module = connectionInternal.connection.getConnectionModuleFor(Bind2ModuleDescriptor.class);
             if (bind2Module != null) {
                 bind2Module.bind2SuccessResult = null;

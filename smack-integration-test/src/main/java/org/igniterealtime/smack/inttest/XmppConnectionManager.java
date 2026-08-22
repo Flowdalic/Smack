@@ -443,7 +443,7 @@ public class XmppConnectionManager {
         return constructConnection(connectionDescriptor, null);
     }
 
-    private <C extends AbstractXMPPConnection> C constructConnection(
+    <C extends AbstractXMPPConnection> C constructConnection(
             XmppConnectionDescriptor<C, ? extends ConnectionConfiguration, ? extends ConnectionConfiguration.Builder<?, ?>> connectionDescriptor,
             Collection<ConnectionConfigurationBuilderApplier> customConnectionConfigurationAppliers)
             throws NoResponseException, XMPPErrorException, NotConnectedException, InterruptedException {
