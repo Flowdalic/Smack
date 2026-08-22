@@ -325,6 +325,13 @@ public final class SASLAuthentication {
     public static SASLMechanism selectMechanism(EntityBareJid authzid, String password, List<String> serverMechanisms,
                     AbstractXMPPConnection connection, ConnectionConfiguration configuration, Predicate<String> skipMechPredicate)
                     throws SmackException.SmackSaslException {
+        return selectMechanism(authzid, password, serverMechanisms, connection, configuration, skipMechPredicate, null);
+    }
+
+    public static SASLMechanism selectMechanism(EntityBareJid authzid, String password, List<String> serverMechanisms,
+                    AbstractXMPPConnection connection, ConnectionConfiguration configuration,
+                    Predicate<String> skipMechPredicate, Predicate<SASLMechanism> mechanismFilter)
+                    throws SmackException.SmackSaslException {
         final boolean passwordAvailable = StringUtils.isNotEmpty(password);
 
         Iterator<SASLMechanism> it = REGISTERED_MECHANISMS.iterator();
@@ -340,7 +347,11 @@ public final class SASLAuthentication {
                 continue;
             }
 
-            if (skipMechPredicate.test(mechanismName)) {
+            if (skipMechPredicate != null && skipMechPredicate.test(mechanismName)) {
+                continue;
+            }
+
+            if (mechanismFilter != null && !mechanismFilter.test(mechanism)) {
                 continue;
             }
 

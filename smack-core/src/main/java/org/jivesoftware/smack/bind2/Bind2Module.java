@@ -16,6 +16,7 @@
  */
 package org.jivesoftware.smack.bind2;
 
+import org.jivesoftware.smack.bind2.element.Bind2Elements;
 import org.jivesoftware.smack.c2s.ModularXmppClientToServerConnection.AuthenticatedAndResourceBoundStateDescriptor;
 import org.jivesoftware.smack.c2s.ModularXmppClientToServerConnection.AuthenticatedButUnboundStateDescriptor;
 import org.jivesoftware.smack.c2s.ModularXmppClientToServerConnectionModule;
@@ -25,18 +26,29 @@ import org.jivesoftware.smack.fsm.State;
 import org.jivesoftware.smack.fsm.StateDescriptor;
 import org.jivesoftware.smack.fsm.StateTransitionResult;
 import org.jivesoftware.smack.sasl.packet.Sasl2Feature;
+import org.jivesoftware.smack.sasl.sasl2.Sasl2Authentication.Sasl2AuthenticationResult;
+import org.jivesoftware.smack.sasl.sasl2.Sasl2Module;
 import org.jivesoftware.smack.sasl.sasl2.Sasl2Module.Sasl2StateDescriptor;
+import org.jivesoftware.smack.sasl.sasl2.Sasl2ModuleDescriptor;
+
+import org.jxmpp.jid.parts.Resourcepart;
 
 public class Bind2Module extends ModularXmppClientToServerConnectionModule<Bind2ModuleDescriptor> {
+
+    private Bind2SuccessResult bind2SuccessResult;
 
     protected Bind2Module(Bind2ModuleDescriptor moduleDescriptor,
                     ModularXmppClientToServerConnectionInternal connectionInternal) {
         super(moduleDescriptor, connectionInternal);
     }
 
+    public Bind2SuccessResult getBind2SuccessResult() {
+        return bind2SuccessResult;
+    }
+
     public static final class Bind2StateDescriptor extends StateDescriptor {
         private Bind2StateDescriptor() {
-            super(Bind2State.class, 386, StateDescriptor.Property.notImplemented);
+            super(Bind2State.class, 386);
 
             addPredeccessor(Sasl2StateDescriptor.class);
             addSuccessor(AuthenticatedAndResourceBoundStateDescriptor.class);
@@ -65,29 +77,72 @@ public class Bind2Module extends ModularXmppClientToServerConnectionModule<Bind2
             // sasl2Feature must always be non-null, because we can only reach the bind2 state via sasl2
             sasl2Feature = connectionInternal.connection.getFeature(Sasl2Feature.class);
 
-            if (sasl2Feature.hasBind2())
-                // We can enter this state.
+            if (sasl2Feature != null && sasl2Feature.hasBind2()) {
                 return null;
+            }
 
             return new StateTransitionResult.TransitionImpossibleReason("Bind 2 not announced by service");
         }
 
         @Override
         public StateTransitionResult.AttemptResult transitionInto(WalkStateGraphContext walkStateGraphContext) {
-            // connectionInternal.prepareToWaitForFeaturesReceived();
+            Sasl2Module sasl2Module = connectionInternal.connection.getConnectionModuleFor(Sasl2ModuleDescriptor.class);
+            if (sasl2Module == null) {
+                return new StateTransitionResult.Failure("SASL 2 module not found on connection");
+            }
 
-            // var loginContext = walkStateGraphContext.getLoginContext();
-            // SASLMechanism usedSaslMechanism = authenticate(loginContext.username, loginContext.password,
-            //                config.getAuthzid(), getSSLSession());
-            // authenticate() will only return if the SASL authentication was successful, but we also need to wait for
-            // the next round of stream features.
+            Sasl2AuthenticationResult result = sasl2Module.getSasl2AuthenticationResult();
+            if (result == null || !result.isResourceBound()) {
+                return new StateTransitionResult.Failure("Bind 2 was not performed during SASL 2 authentication");
+            }
 
-            // waitForFeaturesReceived("server stream features after SASL authentication");
+            Bind2SuccessResult successResult = new Bind2SuccessResult(
+                result.getBoundResource(),
+                walkStateGraphContext.getLoginContext().resource,
+                result.getBound()
+            );
 
-            // return new SaslAuthenticationSuccessResult(usedSaslMechanism);
-            return null;
+            Bind2Module bind2Module = connectionInternal.connection.getConnectionModuleFor(Bind2ModuleDescriptor.class);
+            if (bind2Module != null) {
+                bind2Module.bind2SuccessResult = successResult;
+            }
+
+            return successResult;
         }
 
+        @Override
+        public void resetState() {
+            sasl2Feature = null;
+            Bind2Module bind2Module = connectionInternal.connection.getConnectionModuleFor(Bind2ModuleDescriptor.class);
+            if (bind2Module != null) {
+                bind2Module.bind2SuccessResult = null;
+            }
+        }
+    }
+
+    public static final class Bind2SuccessResult extends StateTransitionResult.Success {
+        private final Resourcepart boundResource;
+        private final Resourcepart requestedResource;
+        private final Bind2Elements.Bound bound;
+
+        public Bind2SuccessResult(Resourcepart boundResource, Resourcepart requestedResource, Bind2Elements.Bound bound) {
+            super("Resource '" + boundResource + "' bound via Bind 2 (requested: '" + requestedResource + "')");
+            this.boundResource = boundResource;
+            this.requestedResource = requestedResource;
+            this.bound = bound;
+        }
+
+        public Resourcepart getBoundResource() {
+            return boundResource;
+        }
+
+        public Resourcepart getRequestedResource() {
+            return requestedResource;
+        }
+
+        public Bind2Elements.Bound getBound() {
+            return bound;
+        }
     }
 
     public Bind2State constructBind2State(Bind2StateDescriptor bind2StateDescriptor,

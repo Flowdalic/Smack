@@ -22,6 +22,7 @@ import java.io.Writer;
 import java.time.ZonedDateTime;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
@@ -1386,6 +1387,11 @@ public abstract class AbstractXMPPConnection implements XMPPConnection {
         this.unknownIqRequestReplyMode = Objects.requireNonNull(unknownIqRequestReplyMode, "Mode must not be null");
     }
 
+    public void setUser(EntityFullJid user) {
+        this.user = Objects.requireNonNull(user, "User JID must not be null");
+        this.xmppServiceDomain = user.asDomainBareJid();
+    }
+
     protected final NonzaCallback.Builder buildNonzaCallback() {
         return new NonzaCallback.Builder(this);
     }
@@ -1393,8 +1399,14 @@ public abstract class AbstractXMPPConnection implements XMPPConnection {
     protected <SN extends Nonza, FN extends Nonza> SN sendAndWaitForResponse(Nonza nonza, Class<SN> successNonzaClass,
                     Class<FN> failedNonzaClass)
                     throws NoResponseException, NotConnectedException, InterruptedException, FailedNonzaException {
+        return sendAndWaitForResponse(nonza, Collections.singleton(successNonzaClass), failedNonzaClass);
+    }
+
+    protected <SN extends Nonza, FN extends Nonza> SN sendAndWaitForResponse(Nonza nonza,
+                    Collection<Class<? extends SN>> successNonzaClasses, Class<FN> failedNonzaClass)
+                    throws NoResponseException, NotConnectedException, InterruptedException, FailedNonzaException {
         NonzaCallback.Builder builder = buildNonzaCallback();
-        SN successNonza = NonzaCallback.sendAndWaitForResponse(builder, nonza, successNonzaClass, failedNonzaClass);
+        SN successNonza = NonzaCallback.sendAndWaitForResponse(builder, nonza, successNonzaClasses, failedNonzaClass);
         return successNonza;
     }
 

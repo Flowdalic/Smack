@@ -246,10 +246,28 @@ public final class ModularXmppClientToServerConnection extends AbstractXMPPConne
             }
 
             @Override
+            public SSLSession getSslSession() {
+                return ModularXmppClientToServerConnection.this.getSSLSession();
+            }
+
+            @Override
+            public void prepareToWaitForFeaturesReceived() {
+                ModularXmppClientToServerConnection.this.prepareToWaitForFeaturesReceived();
+            }
+
+            @Override
             public <SN extends Nonza, FN extends Nonza> SN sendAndWaitForResponse(Nonza nonza,
                             Class<SN> successNonzaClass, Class<FN> failedNonzaClass) throws NoResponseException,
                             NotConnectedException, FailedNonzaException, InterruptedException {
                 return ModularXmppClientToServerConnection.this.sendAndWaitForResponse(nonza, successNonzaClass,
+                                failedNonzaClass);
+            }
+
+            @Override
+            public <SN extends Nonza, FN extends Nonza> SN sendAndWaitForResponse(Nonza nonza,
+                            Collection<Class<? extends SN>> successNonzaClasses, Class<FN> failedNonzaClass) throws NoResponseException,
+                            NotConnectedException, FailedNonzaException, InterruptedException {
+                return ModularXmppClientToServerConnection.this.sendAndWaitForResponse(nonza, successNonzaClasses,
                                 failedNonzaClass);
             }
 
