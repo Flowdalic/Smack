@@ -64,7 +64,6 @@ public class Sasl2IntegrationTest extends AbstractSmackSpecificLowLevelIntegrati
 
     private ModularXmppClientToServerConnection getUnconnectedSasl2OnlyConnection()
                     throws NoResponseException, XMPPErrorException, NotConnectedException, InterruptedException {
-        // TODO: Also remove RFC SASL.
         return getSpecificUnconnectedConnection(
                         builder -> ((ModularXmppClientToServerConnectionConfiguration.Builder) builder).removeModule(
                                         Bind2ModuleDescriptor.class));
