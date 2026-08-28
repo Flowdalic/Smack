@@ -20,10 +20,9 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
-import java.util.function.Predicate;
+import java.util.function.Function;
 
 import javax.xml.namespace.QName;
 
@@ -33,9 +32,9 @@ import org.jivesoftware.smack.SmackException.NotConnectedException;
 import org.jivesoftware.smack.SmackException.SmackSaslException;
 import org.jivesoftware.smack.XMPPException;
 import org.jivesoftware.smack.XMPPException.FailedNonzaException;
-import org.jivesoftware.smack.bind2.element.Bind2Elements;
 import org.jivesoftware.smack.c2s.internal.ModularXmppClientToServerConnectionInternal;
 import org.jivesoftware.smack.fsm.LoginContext;
+import org.jivesoftware.smack.packet.ExtensionElement;
 import org.jivesoftware.smack.packet.Nonza;
 import org.jivesoftware.smack.packet.XmlElement;
 import org.jivesoftware.smack.sasl.SASLErrorException;
@@ -64,13 +63,6 @@ public class Sasl2Authentication {
     }
 
     public Sasl2AuthenticationResult authenticate(LoginContext loginContext, Sasl2Feature sasl2Feature,
-                    Bind2Elements.Bind bind2Request)
-                    throws SmackSaslException, SASLErrorException, FailedNonzaException, NotConnectedException,
-                    NoResponseException, InterruptedException, IOException, XMPPException {
-        return authenticate(loginContext, sasl2Feature, bind2Request != null ? Collections.singleton(bind2Request) : null);
-    }
-
-    public Sasl2AuthenticationResult authenticate(LoginContext loginContext, Sasl2Feature sasl2Feature,
                     Collection<? extends XmlElement> additionalSasl2Extensions)
                     throws SmackSaslException, SASLErrorException, FailedNonzaException, NotConnectedException,
                     NoResponseException, InterruptedException, IOException, XMPPException {
@@ -79,7 +71,7 @@ public class Sasl2Authentication {
 
     public Sasl2AuthenticationResult authenticate(LoginContext loginContext, Sasl2Feature sasl2Feature,
                     Collection<? extends XmlElement> additionalSasl2Extensions,
-                    Predicate<SASLMechanism> mechanismFilter)
+                    Function<SASLMechanism, String> mechanismFilter)
                     throws SmackSaslException, SASLErrorException, FailedNonzaException, NotConnectedException,
                     NoResponseException, InterruptedException, IOException, XMPPException {
         return authenticate(loginContext.username, loginContext.password, loginContext.resource, sasl2Feature,
@@ -87,25 +79,89 @@ public class Sasl2Authentication {
     }
 
     public Sasl2AuthenticationResult authenticate(String username, String password, Resourcepart resource,
+                    Sasl2Feature sasl2Feature, Collection<? extends XmlElement> additionalSasl2Extensions)
+                    throws SmackSaslException, SASLErrorException, FailedNonzaException, NotConnectedException,
+                    NoResponseException, InterruptedException, IOException, XMPPException {
+        return authenticate(username, password, resource, sasl2Feature, additionalSasl2Extensions, null);
+    }
+
+    public Sasl2AuthenticationResult authenticate(String username, String password, Resourcepart resource,
                     Sasl2Feature sasl2Feature, Collection<? extends XmlElement> additionalSasl2Extensions,
-                    Predicate<SASLMechanism> mechanismFilter)
+                    Function<SASLMechanism, String> mechanismFilter)
                     throws SmackSaslException, SASLErrorException, FailedNonzaException, NotConnectedException,
                     NoResponseException, InterruptedException, IOException, XMPPException {
         var connection = connectionInternal.connection;
         var configuration = connection.getConfiguration();
         var authzid = configuration.getAuthzid();
 
+        Function<SASLMechanism, String> skipReasonProvider = mech -> {
+            if (mechanismFilter != null) {
+                String filterReason = mechanismFilter.apply(mech);
+                if (filterReason != null) {
+                    return filterReason;
+                }
+            }
+
+            if (mech instanceof org.jivesoftware.smack.sasl.ht.SaslHtMechanism) {
+                org.jivesoftware.smack.fast.FastModule fastModule = connection.getConnectionModuleFor(org.jivesoftware.smack.fast.FastModuleDescriptor.class);
+                if (fastModule == null) {
+                    return "FastModule is not installed on connection";
+                }
+                String fastSkipReason = fastModule.getSkipReason(mech, configuration);
+                if (fastSkipReason != null) {
+                    return fastSkipReason;
+                }
+            }
+
+            return null;
+        };
+
         final var mechanism = SASLAuthentication.selectMechanism(
             authzid,
             password,
-            sasl2Feature.getMechanisms(),
+            sasl2Feature.getAllAvailableMechanisms(),
             connection,
             configuration,
-            null,
-            mechanismFilter
+            skipReasonProvider
         );
 
-        return authenticate(mechanism, username, password, resource, additionalSasl2Extensions);
+        try {
+            return authenticate(mechanism, username, password, resource, additionalSasl2Extensions);
+        } catch (SASLErrorException e) {
+            if (mechanism instanceof org.jivesoftware.smack.sasl.ht.SaslHtMechanism && mechanismFilter == null) {
+                // The FAST token was rejected / expired by the server. Degrade gracefully.
+                org.jivesoftware.smack.fast.FastModule fastModule = connection.getConnectionModuleFor(org.jivesoftware.smack.fast.FastModuleDescriptor.class);
+                if (fastModule != null) {
+                    fastModule.deleteFastToken();
+                }
+
+                // Re-build extensions: filter out any failed <fast/> authenticate element, and add <request-token/> if available
+                List<XmlElement> fallbackExtensions = new ArrayList<>();
+                if (additionalSasl2Extensions != null) {
+                    for (var ext : additionalSasl2Extensions) {
+                        if (ext instanceof org.jivesoftware.smack.fast.element.FastElements.Fast) {
+                            continue;
+                        }
+                        fallbackExtensions.add(ext);
+                    }
+                }
+                if (fastModule != null && fastModule.isAutoRequestToken() && sasl2Feature.hasInlineFeature(org.jivesoftware.smack.fast.element.FastElements.Fast.class)) {
+                    var fastFeature = sasl2Feature.getInlineFeature(org.jivesoftware.smack.fast.element.FastElements.Fast.class);
+                    String prefMech = fastModule.getPreferredFastMechanism();
+                    if (fastFeature != null && fastFeature.getMechanisms().contains(prefMech)) {
+                        fallbackExtensions.add(new org.jivesoftware.smack.fast.element.FastElements.RequestToken(prefMech));
+                    } else if (fastFeature != null && !fastFeature.getMechanisms().isEmpty()) {
+                        fallbackExtensions.add(new org.jivesoftware.smack.fast.element.FastElements.RequestToken(fastFeature.getMechanisms().get(0)));
+                    } else {
+                        fallbackExtensions.add(new org.jivesoftware.smack.fast.element.FastElements.RequestToken(prefMech));
+                    }
+                }
+
+                return authenticate(username, password, resource, sasl2Feature, fallbackExtensions,
+                                m -> m instanceof org.jivesoftware.smack.sasl.ht.SaslHtMechanism ? "FAST authentication failed; degrading to non-FAST authentication" : null);
+            }
+            throw e;
+        }
     }
 
     public Sasl2AuthenticationResult authenticate(SASLMechanism mechanism, LoginContext loginContext,
@@ -179,31 +235,53 @@ public class Sasl2Authentication {
         }
         mechanism.afterFinalSaslChallenge();
 
-        Bind2Elements.Bound bound = null;
-        for (var ext : success.getExtensionElements()) {
-            if (ext instanceof Bind2Elements.Bound) {
-                bound = (Bind2Elements.Bound) ext;
-                break;
+        var fastTokenExt = success.getExtension(org.jivesoftware.smack.fast.element.FastElements.Token.class);
+        org.jivesoftware.smack.fast.FastModule fastModule = connection.getConnectionModuleFor(org.jivesoftware.smack.fast.FastModuleDescriptor.class);
+        if (fastTokenExt != null && fastModule != null) {
+            String tokenMechanism = null;
+            if (additionalSasl2Extensions != null) {
+                for (var ext : additionalSasl2Extensions) {
+                    if (ext instanceof org.jivesoftware.smack.fast.element.FastElements.RequestToken) {
+                        tokenMechanism = ((org.jivesoftware.smack.fast.element.FastElements.RequestToken) ext).getMechanism();
+                        break;
+                    }
+                }
+            }
+            if (tokenMechanism == null) {
+                if (mechanism instanceof org.jivesoftware.smack.sasl.ht.SaslHtMechanism) {
+                    tokenMechanism = mechanism.getName();
+                } else {
+                    tokenMechanism = fastModule.getPreferredFastMechanism();
+                }
+            }
+            fastModule.setFastToken(new org.jivesoftware.smack.fast.FastToken(fastTokenExt.getToken(), tokenMechanism, fastTokenExt.getExpiry()));
+        } else if (fastModule != null && additionalSasl2Extensions != null) {
+            for (var ext : additionalSasl2Extensions) {
+                if (ext instanceof org.jivesoftware.smack.fast.element.FastElements.Fast) {
+                    var fastElem = (org.jivesoftware.smack.fast.element.FastElements.Fast) ext;
+                    if (Boolean.TRUE.equals(fastElem.isInvalidate())) {
+                        fastModule.deleteFastToken();
+                        break;
+                    }
+                }
             }
         }
 
         EntityFullJid boundFullJid = null;
         Resourcepart boundResource = null;
         var authzidSeq = success.getAuthorizationIdentifier();
-        if (bound != null) {
-            if (authzidSeq != null) {
-                var jid = JidCreate.from(authzidSeq);
-                if (jid.hasResource()) {
-                    boundFullJid = jid.asEntityFullJidIfPossible();
-                    if (boundFullJid != null) {
-                        boundResource = boundFullJid.getResourcepart();
-                        connectionInternal.setUser(boundFullJid);
-                    }
+        if (authzidSeq != null) {
+            var jid = JidCreate.from(authzidSeq);
+            if (jid.hasResource()) {
+                boundFullJid = jid.asEntityFullJidIfPossible();
+                if (boundFullJid != null) {
+                    boundResource = boundFullJid.getResourcepart();
+                    connectionInternal.setUser(boundFullJid);
                 }
             }
         }
 
-        return new Sasl2AuthenticationResult(mechanism, success, authzidSeq, boundFullJid, boundResource, bound);
+        return new Sasl2AuthenticationResult(mechanism, success, authzidSeq, boundFullJid, boundResource);
     }
 
     private Sasl2Nonza sendAndWaitForResponse(Nonza nonza, SASLMechanism mechanism)
@@ -226,17 +304,14 @@ public class Sasl2Authentication {
         private final CharSequence authorizationIdentifier;
         private final EntityFullJid boundFullJid;
         private final Resourcepart boundResource;
-        private final Bind2Elements.Bound bound;
 
         public Sasl2AuthenticationResult(SASLMechanism usedSaslMechanism, Sasl2Nonza.Success successNonza,
-                        CharSequence authorizationIdentifier, EntityFullJid boundFullJid, Resourcepart boundResource,
-                        Bind2Elements.Bound bound) {
+                        CharSequence authorizationIdentifier, EntityFullJid boundFullJid, Resourcepart boundResource) {
             this.usedSaslMechanism = usedSaslMechanism;
             this.successNonza = successNonza;
             this.authorizationIdentifier = authorizationIdentifier;
             this.boundFullJid = boundFullJid;
             this.boundResource = boundResource;
-            this.bound = bound;
         }
 
         public SASLMechanism getUsedSaslMechanism() {
@@ -259,12 +334,12 @@ public class Sasl2Authentication {
             return boundResource;
         }
 
-        public Bind2Elements.Bound getBound() {
-            return bound;
+        public boolean isStreamResumed() {
+            return getSuccessExtension("resumed", "urn:xmpp:sm:3") != null;
         }
 
         public boolean isResourceBound() {
-            return bound != null && boundFullJid != null;
+            return boundFullJid != null;
         }
 
         public List<XmlElement> getSuccessExtensions() {
@@ -272,25 +347,23 @@ public class Sasl2Authentication {
         }
 
         public XmlElement getSuccessExtension(String elementName, String namespace) {
-            for (var ext : getSuccessExtensions()) {
-                if (ext.getElementName().equals(elementName) && ext.getNamespace().equals(namespace)) {
-                    return ext;
-                }
-            }
-            return null;
+            return successNonza.getExtension(new QName(namespace, elementName));
         }
 
         public XmlElement getSuccessExtension(QName qname) {
-            return getSuccessExtension(qname.getLocalPart(), qname.getNamespaceURI());
+            return successNonza.getExtension(qname);
         }
 
-        public <E extends XmlElement> E getSuccessExtension(Class<E> extensionElementClass) {
-            for (var ext : getSuccessExtensions()) {
-                if (extensionElementClass.isInstance(ext)) {
-                    return extensionElementClass.cast(ext);
-                }
-            }
-            return null;
+        public <E extends ExtensionElement> E getSuccessExtension(Class<E> extensionElementClass) {
+            return successNonza.getExtension(extensionElementClass);
+        }
+
+        public <E extends ExtensionElement> boolean hasSuccessExtension(Class<E> extensionElementClass) {
+            return successNonza.hasExtension(extensionElementClass);
+        }
+
+        public <E extends ExtensionElement> List<E> getSuccessExtensions(Class<E> extensionElementClass) {
+            return successNonza.getExtensions(extensionElementClass);
         }
     }
 }

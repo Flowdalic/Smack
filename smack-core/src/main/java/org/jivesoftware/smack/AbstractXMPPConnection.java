@@ -1,6 +1,6 @@
 /*
  *
- * Copyright 2009 Jive Software, 2018-2025 Florian Schmaus.
+ * Copyright 2009 Jive Software, 2018-2026 Florian Schmaus.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -824,7 +824,7 @@ public abstract class AbstractXMPPConnection implements XMPPConnection {
         return saslAuthentication.getNameOfLastUsedSaslMechansism();
     }
 
-    private DomainBareJid xmppServiceDomain;
+    protected DomainBareJid xmppServiceDomain;
 
     protected Lock getConnectionLock() {
         return connectionLock;
@@ -1385,11 +1385,6 @@ public abstract class AbstractXMPPConnection implements XMPPConnection {
      */
     public void setUnknownIqRequestReplyMode(UnknownIqRequestReplyMode unknownIqRequestReplyMode) {
         this.unknownIqRequestReplyMode = Objects.requireNonNull(unknownIqRequestReplyMode, "Mode must not be null");
-    }
-
-    public void setUser(EntityFullJid user) {
-        this.user = Objects.requireNonNull(user, "User JID must not be null");
-        this.xmppServiceDomain = user.asDomainBareJid();
     }
 
     protected final NonzaCallback.Builder buildNonzaCallback() {

@@ -25,6 +25,7 @@ import org.jivesoftware.smack.c2s.internal.WalkStateGraphContext;
 import org.jivesoftware.smack.fsm.State;
 import org.jivesoftware.smack.fsm.StateDescriptor;
 import org.jivesoftware.smack.fsm.StateTransitionResult;
+import org.jivesoftware.smack.sasl.packet.Sasl2Nonza;
 import org.jivesoftware.smack.sasl.sasl2.Sasl2Authentication.Sasl2AuthenticationResult;
 import org.jivesoftware.smack.sasl.sasl2.Sasl2Module;
 import org.jivesoftware.smack.sasl.sasl2.Sasl2Module.Sasl2StateDescriptor;
@@ -103,7 +104,8 @@ public class Bind2Module extends ModularXmppClientToServerConnectionModule<Bind2
             Bind2SuccessResult successResult = new Bind2SuccessResult(
                 result.getBoundResource(),
                 walkStateGraphContext.getLoginContext().resource,
-                result.getBound()
+                result.getSuccessExtension(Bind2Elements.Bound.class),
+                result.getSuccessNonza()
             );
 
             Bind2Module bind2Module = connectionInternal.connection.getConnectionModuleFor(Bind2ModuleDescriptor.class);
@@ -127,12 +129,20 @@ public class Bind2Module extends ModularXmppClientToServerConnectionModule<Bind2
         private final Resourcepart boundResource;
         private final Resourcepart requestedResource;
         private final Bind2Elements.Bound bound;
+        private final Sasl2Nonza.Success successNonza;
 
-        public Bind2SuccessResult(Resourcepart boundResource, Resourcepart requestedResource, Bind2Elements.Bound bound) {
+        public Bind2SuccessResult(Resourcepart boundResource, Resourcepart requestedResource,
+                        Bind2Elements.Bound bound, Sasl2Nonza.Success successNonza) {
             super("Resource '" + boundResource + "' bound via Bind 2 (requested: '" + requestedResource + "')");
             this.boundResource = boundResource;
             this.requestedResource = requestedResource;
             this.bound = bound;
+            this.successNonza = successNonza;
+        }
+
+        public Bind2SuccessResult(Resourcepart boundResource, Resourcepart requestedResource,
+                        Bind2Elements.Bound bound) {
+            this(boundResource, requestedResource, bound, null);
         }
 
         public Resourcepart getBoundResource() {
@@ -145,6 +155,10 @@ public class Bind2Module extends ModularXmppClientToServerConnectionModule<Bind2
 
         public Bind2Elements.Bound getBound() {
             return bound;
+        }
+
+        public Sasl2Nonza.Success getSuccessNonza() {
+            return successNonza;
         }
     }
 

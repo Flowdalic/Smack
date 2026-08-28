@@ -27,6 +27,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.ListIterator;
 import java.util.Map;
+import java.util.Objects;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
@@ -85,6 +86,7 @@ import org.jivesoftware.smack.xml.XmlPullParser;
 import org.jivesoftware.smack.xml.XmlPullParserException;
 
 import org.jxmpp.jid.DomainBareJid;
+import org.jxmpp.jid.EntityFullJid;
 import org.jxmpp.jid.parts.Resourcepart;
 import org.jxmpp.util.XmppStringUtils;
 
@@ -301,6 +303,12 @@ public final class ModularXmppClientToServerConnection extends AbstractXMPPConne
             @Override
             public void notifyDataReceived() {
                 ModularXmppClientToServerConnection.this.notifyDataReceived();
+            }
+
+            @Override
+            public void setUser(EntityFullJid user) {
+                ModularXmppClientToServerConnection.this.user = Objects.requireNonNull(user, "User JID must not be null");
+                ModularXmppClientToServerConnection.this.xmppServiceDomain = user.asDomainBareJid();
             }
         };
 

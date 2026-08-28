@@ -22,11 +22,11 @@ import java.util.List;
 
 import javax.xml.namespace.QName;
 
-import org.jivesoftware.smack.bind2.element.Bind2Elements;
 import org.jivesoftware.smack.packet.ExtensionElement;
 import org.jivesoftware.smack.packet.XmlElement;
 import org.jivesoftware.smack.packet.XmlEnvironment;
 import org.jivesoftware.smack.util.XmlStringBuilder;
+import org.jivesoftware.smack.util.XmppElementUtil;
 
 public class Sasl2Feature implements ExtensionElement {
     public static final String ELEMENT = "authentication";
@@ -34,11 +34,15 @@ public class Sasl2Feature implements ExtensionElement {
     public static final QName QNAME = new QName(NAMESPACE, ELEMENT);
 
     private final List<String> mechanisms;
-    private final List<XmlElement> inlineFeatures;
+    private final Inline inline;
+
+    public Sasl2Feature(List<String> mechanisms, Inline inline) {
+        this.mechanisms = mechanisms == null ? Collections.emptyList() : Collections.unmodifiableList(new ArrayList<>(mechanisms));
+        this.inline = inline;
+    }
 
     public Sasl2Feature(List<String> mechanisms, List<? extends XmlElement> inlineFeatures) {
-        this.mechanisms = mechanisms == null ? Collections.emptyList() : Collections.unmodifiableList(new ArrayList<>(mechanisms));
-        this.inlineFeatures = inlineFeatures == null ? Collections.emptyList() : Collections.unmodifiableList(new ArrayList<>(inlineFeatures));
+        this(mechanisms, inlineFeatures == null || inlineFeatures.isEmpty() ? null : new Inline(inlineFeatures));
     }
 
     @Override
@@ -55,27 +59,70 @@ public class Sasl2Feature implements ExtensionElement {
         return mechanisms;
     }
 
-    public List<XmlElement> getInlineFeatures() {
-        return inlineFeatures;
+    public List<String> getAllAvailableMechanisms() {
+        var fast = getInlineFeature(org.jivesoftware.smack.fast.element.FastElements.Fast.class);
+        if (fast == null || fast.getMechanisms() == null || fast.getMechanisms().isEmpty()) {
+            return mechanisms;
+        }
+        List<String> all = new ArrayList<>(mechanisms.size() + fast.getMechanisms().size());
+        all.addAll(mechanisms);
+        all.addAll(fast.getMechanisms());
+        return all;
     }
 
-    public boolean hasBind2() {
-        for (XmlElement feature : inlineFeatures) {
-            if (Bind2Elements.Bind.QNAME.equals(feature.getQName())
-                || (Bind2Elements.Bind.ELEMENT.equals(feature.getElementName()) && Bind2Elements.NAMESPACE.equals(feature.getNamespace()))) {
-                return true;
-            }
+    public boolean isMechanismAvailable(String mechanism) {
+        if (mechanisms.contains(mechanism)) {
+            return true;
+        }
+        var fast = getInlineFeature(org.jivesoftware.smack.fast.element.FastElements.Fast.class);
+        if (fast != null && fast.getMechanisms() != null && fast.getMechanisms().contains(mechanism)) {
+            return true;
         }
         return false;
     }
 
-    public Bind2Elements.Bind getBind2Feature() {
-        for (XmlElement feature : inlineFeatures) {
-            if (feature instanceof Bind2Elements.Bind) {
-                return (Bind2Elements.Bind) feature;
-            }
-        }
-        return null;
+    public Inline getInline() {
+        return inline;
+    }
+
+    public boolean hasInline() {
+        return inline != null;
+    }
+
+    public List<XmlElement> getInlineFeatures() {
+        return inline == null ? Collections.emptyList() : inline.getFeatures();
+    }
+
+    public boolean hasInlineFeature(Class<? extends ExtensionElement> featureClass) {
+        return inline != null && inline.hasFeature(featureClass);
+    }
+
+    public boolean hasInlineFeature(QName qname) {
+        return inline != null && inline.hasFeature(qname);
+    }
+
+    public boolean hasInlineFeature(String elementName, String namespace) {
+        return inline != null && inline.hasFeature(elementName, namespace);
+    }
+
+    public <E extends ExtensionElement> E getInlineFeature(Class<E> featureClass) {
+        return inline != null ? inline.getFeature(featureClass) : null;
+    }
+
+    public XmlElement getInlineFeature(QName qname) {
+        return inline != null ? inline.getFeature(qname) : null;
+    }
+
+    public XmlElement getInlineFeature(String elementName, String namespace) {
+        return inline != null ? inline.getFeature(elementName, namespace) : null;
+    }
+
+    public <E extends ExtensionElement> List<E> getInlineFeatures(Class<E> featureClass) {
+        return inline != null ? inline.getFeatures(featureClass) : Collections.emptyList();
+    }
+
+    public List<XmlElement> getInlineFeatures(QName qname) {
+        return inline != null ? inline.getFeatures(qname) : Collections.emptyList();
     }
 
     @Override
@@ -85,13 +132,92 @@ public class Sasl2Feature implements ExtensionElement {
         for (String mechanism : mechanisms) {
             xml.element("mechanism", mechanism);
         }
-        if (!inlineFeatures.isEmpty()) {
-            xml.openElement("inline");
-            xml.append(inlineFeatures);
-            xml.closeElement("inline");
-        }
+        xml.optAppend(inline);
         xml.closeElement(this);
         return xml;
+    }
+
+    public static class Inline implements ExtensionElement {
+        public static final String ELEMENT = "inline";
+        public static final String NAMESPACE = Sasl2Nonza.NAMESPACE;
+        public static final QName QNAME = new QName(NAMESPACE, ELEMENT);
+
+        private final List<XmlElement> features;
+
+        public Inline(List<? extends XmlElement> features) {
+            this.features = features == null ? Collections.emptyList()
+                            : Collections.unmodifiableList(new ArrayList<>(features));
+        }
+
+        @Override
+        public String getElementName() {
+            return ELEMENT;
+        }
+
+        @Override
+        public String getNamespace() {
+            return NAMESPACE;
+        }
+
+        public List<XmlElement> getFeatures() {
+            return features;
+        }
+
+        public boolean hasFeature(Class<? extends ExtensionElement> featureClass) {
+            return getFeature(featureClass) != null;
+        }
+
+        public boolean hasFeature(QName qname) {
+            return getFeature(qname) != null;
+        }
+
+        public boolean hasFeature(String elementName, String namespace) {
+            return getFeature(elementName, namespace) != null;
+        }
+
+        public <E extends ExtensionElement> E getFeature(Class<E> featureClass) {
+            return XmppElementUtil.from(features, featureClass);
+        }
+
+        public XmlElement getFeature(QName qname) {
+            for (XmlElement feature : features) {
+                if (qname.equals(feature.getQName())) {
+                    return feature;
+                }
+            }
+            return null;
+        }
+
+        public XmlElement getFeature(String elementName, String namespace) {
+            return getFeature(new QName(namespace, elementName));
+        }
+
+        public <E extends ExtensionElement> List<E> getFeatures(Class<E> featureClass) {
+            return XmppElementUtil.getElementsFrom(features, featureClass);
+        }
+
+        public List<XmlElement> getFeatures(QName qname) {
+            List<XmlElement> res = new ArrayList<>();
+            for (XmlElement feature : features) {
+                if (qname.equals(feature.getQName())) {
+                    res.add(feature);
+                }
+            }
+            return Collections.unmodifiableList(res);
+        }
+
+        @Override
+        public XmlStringBuilder toXML(XmlEnvironment xmlEnvironment) {
+            XmlStringBuilder xml = new XmlStringBuilder(this, xmlEnvironment);
+            if (features.isEmpty()) {
+                xml.closeEmptyElement();
+                return xml;
+            }
+            xml.rightAngleBracket();
+            xml.append(features);
+            xml.closeElement(this);
+            return xml;
+        }
     }
 
 }

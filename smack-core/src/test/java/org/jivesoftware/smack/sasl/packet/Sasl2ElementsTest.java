@@ -59,7 +59,9 @@ public class Sasl2ElementsTest {
 
         String xml = feature.toXML(XmlEnvironment.EMPTY).toString();
         assertXmlSimilar("<authentication xmlns='urn:xmpp:sasl:2'><mechanism>SCRAM-SHA-1</mechanism><mechanism>PLAIN</mechanism></authentication>", xml);
-        assertFalse(feature.hasBind2());
+        assertFalse(feature.hasInline());
+        assertNull(feature.getInline());
+        assertFalse(feature.hasInlineFeature(Bind2Elements.Bind.class));
     }
 
     @ParameterizedTest
@@ -68,14 +70,19 @@ public class Sasl2ElementsTest {
         Bind2Elements.Bind bindFeature = new Bind2Elements.Bind(
             Collections.singleton("urn:xmpp:carbons:2"), null, Collections.emptyList()
         );
+        Sasl2Feature.Inline inline = new Sasl2Feature.Inline(Collections.singletonList(bindFeature));
         Sasl2Feature feature = new Sasl2Feature(
             Arrays.asList("SCRAM-SHA-1-PLUS", "SCRAM-SHA-1"),
-            Collections.singletonList(bindFeature)
+            inline
         );
 
         String xml = feature.toXML(XmlEnvironment.EMPTY).toString();
         assertXmlSimilar("<authentication xmlns='urn:xmpp:sasl:2'><mechanism>SCRAM-SHA-1-PLUS</mechanism><mechanism>SCRAM-SHA-1</mechanism><inline><bind xmlns='urn:xmpp:bind:0'><inline><feature var='urn:xmpp:carbons:2'/></inline></bind></inline></authentication>", xml);
-        assertTrue(feature.hasBind2());
+        assertTrue(feature.hasInline());
+        assertNotNull(feature.getInline());
+        assertTrue(feature.getInline().hasFeature(Bind2Elements.Bind.class));
+        assertNotNull(feature.getInline().getFeature(Bind2Elements.Bind.class));
+        assertTrue(feature.hasInlineFeature(Bind2Elements.Bind.class));
 
         XmlPullParser parser = SmackTestUtil.getParserFor(xml, parserKind);
         Sasl2Feature parsed = Sasl2Provider.Sasl2FeatureProvider.INSTANCE.parse(
@@ -84,8 +91,12 @@ public class Sasl2ElementsTest {
         assertEquals(2, parsed.getMechanisms().size());
         assertEquals("SCRAM-SHA-1-PLUS", parsed.getMechanisms().get(0));
         assertEquals("SCRAM-SHA-1", parsed.getMechanisms().get(1));
-        assertTrue(parsed.hasBind2());
-        assertNotNull(parsed.getBind2Feature());
+        assertTrue(parsed.hasInline());
+        assertNotNull(parsed.getInline());
+        assertTrue(parsed.getInline().hasFeature(Bind2Elements.Bind.class));
+        assertNotNull(parsed.getInline().getFeature(Bind2Elements.Bind.class));
+        assertTrue(parsed.hasInlineFeature(Bind2Elements.Bind.class));
+        assertNotNull(parsed.getInlineFeature(Bind2Elements.Bind.class));
     }
 
     @Test
@@ -118,8 +129,9 @@ public class Sasl2ElementsTest {
         assertEquals("AwesomeXMPP", parsed.getUserAgent().getSoftware());
         assertNull(parsed.getUserAgent().getDevice());
         assertEquals(1, parsed.getExtensionElements().size());
-        assertTrue(parsed.getExtensionElements().get(0) instanceof Bind2Elements.Bind);
-        Bind2Elements.Bind parsedBind = (Bind2Elements.Bind) parsed.getExtensionElements().get(0);
+        assertTrue(parsed.hasExtension(Bind2Elements.Bind.class));
+        Bind2Elements.Bind parsedBind = parsed.getExtension(Bind2Elements.Bind.class);
+        assertNotNull(parsedBind);
         assertEquals("AwesomeXMPP", parsedBind.getTag());
     }
 
@@ -169,7 +181,8 @@ public class Sasl2ElementsTest {
         assertEquals("YWRkaXRpb25hbA==", parsed.getAdditionalData());
         assertEquals("user@example.com/AwesomeXMPP.1234", parsed.getAuthorizationIdentifier().toString());
         assertEquals(1, parsed.getExtensionElements().size());
-        assertTrue(parsed.getExtensionElements().get(0) instanceof Bind2Elements.Bound);
+        assertTrue(parsed.hasExtension(Bind2Elements.Bound.class));
+        assertNotNull(parsed.getExtension(Bind2Elements.Bound.class));
     }
 
     @ParameterizedTest

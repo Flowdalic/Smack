@@ -17,6 +17,7 @@
 package org.jivesoftware.smack.sasl.sasl2;
 
 import java.io.IOException;
+import java.util.List;
 
 import org.jivesoftware.smack.SmackException;
 import org.jivesoftware.smack.XMPPException;
@@ -88,17 +89,38 @@ public class Sasl2Module extends ModularXmppClientToServerConnectionModule<Sasl2
         @Override
         public StateTransitionResult.AttemptResult transitionInto(WalkStateGraphContext walkStateGraphContext)
                         throws SmackException, XMPPException, IOException, InterruptedException {
-            Bind2Module bind2Module = connectionInternal.connection.getConnectionModuleFor(Bind2ModuleDescriptor.class);
-            boolean useBind2 = bind2Module != null && sasl2Feature.hasBind2();
+            List<org.jivesoftware.smack.packet.XmlElement> sasl2Extensions = new java.util.ArrayList<>();
 
-            Bind2Elements.Bind bind2Request = null;
+            Bind2Module bind2Module = connectionInternal.connection.getConnectionModuleFor(Bind2ModuleDescriptor.class);
+            boolean useBind2 = bind2Module != null && sasl2Feature.hasInlineFeature(Bind2Elements.Bind.class);
+
             LoginContext loginContext = walkStateGraphContext.getLoginContext();
             if (useBind2) {
                 String tag = null;
                 if (loginContext.resource != null) {
                     tag = loginContext.resource.toString();
                 }
-                bind2Request = new Bind2Elements.Bind(tag, null);
+                sasl2Extensions.add(new Bind2Elements.Bind(tag, null));
+            }
+
+            org.jivesoftware.smack.fast.FastModule fastModule = connectionInternal.connection.getConnectionModuleFor(
+                org.jivesoftware.smack.fast.FastModuleDescriptor.class);
+            if (fastModule != null && fastModule.isEnabled()) {
+                org.jivesoftware.smack.fast.FastToken token = fastModule.getFastToken();
+                if (token != null && !token.isExpired() && sasl2Feature.isMechanismAvailable(token.getMechanism())) {
+                    long count = fastModule.incrementTokenCount();
+                    sasl2Extensions.add(new org.jivesoftware.smack.fast.element.FastElements.Fast(count > 0 ? count : null, fastModule.isInvalidateToken()));
+                } else if (fastModule.isAutoRequestToken() && sasl2Feature.hasInlineFeature(org.jivesoftware.smack.fast.element.FastElements.Fast.class)) {
+                    String prefMech = fastModule.getPreferredFastMechanism();
+                    org.jivesoftware.smack.fast.element.FastElements.Fast fastFeature = sasl2Feature.getInlineFeature(org.jivesoftware.smack.fast.element.FastElements.Fast.class);
+                    if (fastFeature != null && fastFeature.getMechanisms().contains(prefMech)) {
+                        sasl2Extensions.add(new org.jivesoftware.smack.fast.element.FastElements.RequestToken(prefMech));
+                    } else if (fastFeature != null && !fastFeature.getMechanisms().isEmpty()) {
+                        sasl2Extensions.add(new org.jivesoftware.smack.fast.element.FastElements.RequestToken(fastFeature.getMechanisms().get(0)));
+                    } else {
+                        sasl2Extensions.add(new org.jivesoftware.smack.fast.element.FastElements.RequestToken(prefMech));
+                    }
+                }
             }
 
             if (!useBind2) {
@@ -109,7 +131,7 @@ public class Sasl2Module extends ModularXmppClientToServerConnectionModule<Sasl2
             Sasl2AuthenticationResult result = sasl2Authentication.authenticate(
                 loginContext,
                 sasl2Feature,
-                bind2Request
+                sasl2Extensions
             );
 
             Sasl2Module sasl2Module = connectionInternal.connection.getConnectionModuleFor(Sasl2ModuleDescriptor.class);
@@ -117,7 +139,7 @@ public class Sasl2Module extends ModularXmppClientToServerConnectionModule<Sasl2
                 sasl2Module.sasl2AuthenticationResult = result;
             }
 
-            if (!useBind2) {
+            if (!useBind2 && !result.isResourceBound() && !result.isStreamResumed()) {
                 connectionInternal.waitForFeaturesReceived("server stream features after SASL2 authentication");
             }
 

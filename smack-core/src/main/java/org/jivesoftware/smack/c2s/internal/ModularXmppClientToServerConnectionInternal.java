@@ -139,9 +139,7 @@ public abstract class ModularXmppClientToServerConnectionInternal {
                     Collection<Class<? extends SN>> successNonzaClasses, Class<FN> failedNonzaClass)
                     throws NoResponseException, NotConnectedException, FailedNonzaException, InterruptedException;
 
-    public final void setUser(EntityFullJid user) {
-        connection.setUser(user);
-    }
+    public abstract void setUser(EntityFullJid user);
 
     public abstract void asyncGo(Runnable runnable);
 

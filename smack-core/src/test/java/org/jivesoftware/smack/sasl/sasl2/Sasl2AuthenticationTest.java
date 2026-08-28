@@ -34,7 +34,6 @@ import java.util.ListIterator;
 import java.util.Queue;
 import java.util.Set;
 import java.util.function.Function;
-import java.util.function.Predicate;
 import java.util.function.Supplier;
 
 import javax.net.ssl.SSLSession;
@@ -60,6 +59,7 @@ import org.jivesoftware.smack.fsm.State;
 import org.jivesoftware.smack.fsm.StateDescriptor;
 import org.jivesoftware.smack.fsm.StateTransitionResult;
 import org.jivesoftware.smack.internal.SmackTlsContext;
+import org.jivesoftware.smack.packet.ExtensionElement;
 import org.jivesoftware.smack.packet.Nonza;
 import org.jivesoftware.smack.packet.TopLevelStreamElement;
 import org.jivesoftware.smack.packet.XmlElement;
@@ -77,6 +77,7 @@ import org.jivesoftware.smack.util.stringencoder.Base64;
 import org.jivesoftware.smack.xml.XmlPullParser;
 
 import org.junit.jupiter.api.Test;
+import org.jxmpp.jid.EntityFullJid;
 import org.jxmpp.jid.impl.JidCreate;
 import org.jxmpp.jid.parts.Resourcepart;
 import org.jxmpp.stringprep.XmppStringprepException;
@@ -223,6 +224,10 @@ public class Sasl2AuthenticationTest extends SmackTestSuite {
         @Override
         public void setTransport(XmppClientToServerTransport xmppTransport) {
         }
+
+        @Override
+        public void setUser(EntityFullJid user) {
+        }
     }
 
     public static final class DummyTransportModuleDescriptor extends ModularXmppClientToServerConnectionModuleDescriptor {
@@ -295,7 +300,7 @@ public class Sasl2AuthenticationTest extends SmackTestSuite {
         return new MockConnectionInternal(connection);
     }
 
-    public static final class TestFastElement implements XmlElement {
+    public static final class TestFastElement implements ExtensionElement {
         public static final String ELEMENT = "fast";
         public static final String NAMESPACE = "urn:xmpp:fast:0";
         public static final QName QNAME = new QName(NAMESPACE, ELEMENT);
@@ -340,7 +345,7 @@ public class Sasl2AuthenticationTest extends SmackTestSuite {
         Sasl2Nonza.Success serverSuccess = new Sasl2Nonza.Success(null, "anon@example.org", null);
         connectionInternal.queueResponse(serverSuccess);
 
-        Sasl2AuthenticationResult result = sasl2Authentication.authenticate(loginContext, sasl2Feature, (Bind2Elements.Bind) null);
+        Sasl2AuthenticationResult result = sasl2Authentication.authenticate(loginContext, sasl2Feature, (Collection<? extends XmlElement>) null);
 
         assertEquals(SASLAnonymous.NAME, result.getUsedSaslMechanism().getName());
         assertEquals("anon@example.org", result.getAuthorizationIdentifier().toString());
@@ -366,14 +371,14 @@ public class Sasl2AuthenticationTest extends SmackTestSuite {
         Sasl2Nonza.Success serverSuccess = new Sasl2Nonza.Success(null, "anon@example.org/smack-resource", Collections.singletonList(boundElement));
         connectionInternal.queueResponse(serverSuccess);
 
-        Sasl2AuthenticationResult result = sasl2Authentication.authenticate(loginContext, sasl2Feature, bind2Request);
+        Sasl2AuthenticationResult result = sasl2Authentication.authenticate(loginContext, sasl2Feature, Collections.singletonList(bind2Request));
 
         assertEquals(SASLAnonymous.NAME, result.getUsedSaslMechanism().getName());
         assertEquals("anon@example.org/smack-resource", result.getAuthorizationIdentifier().toString());
         assertTrue(result.isResourceBound());
         assertEquals(JidCreate.entityFullFrom("anon@example.org/smack-resource"), result.getBoundFullJid());
         assertEquals(Resourcepart.from("smack-resource"), result.getBoundResource());
-        assertNotNull(result.getBound());
+        assertNotNull(result.getSuccessExtension(Bind2Elements.Bound.class));
 
         assertEquals(1, connectionInternal.getSentNonzas().size());
         Sasl2Nonza.Authenticate sentAuth = (Sasl2Nonza.Authenticate) connectionInternal.getSentNonzas().get(0);
@@ -478,7 +483,7 @@ public class Sasl2AuthenticationTest extends SmackTestSuite {
             LoginContext loginContext = new LoginContext("user", "pencil", Resourcepart.from("smack-res"));
 
             // Filter out TestMultiStepMechanism (allow only mechanisms other than TestMultiStepMechanism)
-            Predicate<SASLMechanism> mechanismFilter = mech -> !mech.getName().equals(TestMultiStepMechanism.NAME);
+            Function<SASLMechanism, String> mechanismFilter = mech -> mech.getName().equals(TestMultiStepMechanism.NAME) ? "excluded by test filter" : null;
 
             Sasl2Nonza.Success serverSuccess = new Sasl2Nonza.Success(null, "anon@example.org", null);
             connectionInternal.queueResponse(serverSuccess);
@@ -582,7 +587,7 @@ public class Sasl2AuthenticationTest extends SmackTestSuite {
         connectionInternal.queueResponse(failureNonza);
 
         SASLErrorException thrown = assertThrows(SASLErrorException.class, () ->
-            sasl2Authentication.authenticate(loginContext, sasl2Feature, (Bind2Elements.Bind) null)
+            sasl2Authentication.authenticate(loginContext, sasl2Feature, (Collection<? extends XmlElement>) null)
         );
 
         assertEquals(SASLAnonymous.NAME, thrown.getMechanism());
@@ -603,7 +608,7 @@ public class Sasl2AuthenticationTest extends SmackTestSuite {
         connectionInternal.queueResponse(continueNonza);
 
         SmackSaslException thrown = assertThrows(SmackSaslException.class, () ->
-            sasl2Authentication.authenticate(loginContext, sasl2Feature, (Bind2Elements.Bind) null)
+            sasl2Authentication.authenticate(loginContext, sasl2Feature, (Collection<? extends XmlElement>) null)
         );
 
         assertTrue(thrown.getMessage().contains("continue"));

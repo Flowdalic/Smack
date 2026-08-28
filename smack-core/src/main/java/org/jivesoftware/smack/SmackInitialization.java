@@ -130,6 +130,23 @@ public final class SmackInitialization {
         SASLAuthentication.registerSASLMechanism(new SASLXOauth2Mechanism());
         SASLAuthentication.registerSASLMechanism(new SASLAnonymous());
 
+        SASLAuthentication.registerSASLMechanism(new org.jivesoftware.smack.sasl.ht.HtSha256EndpointMechanism());
+        SASLAuthentication.registerSASLMechanism(new org.jivesoftware.smack.sasl.ht.HtSha256NoneMechanism());
+        SASLAuthentication.registerSASLMechanism(new org.jivesoftware.smack.sasl.ht.HtSha256ExporterMechanism());
+        SASLAuthentication.registerSASLMechanism(new org.jivesoftware.smack.sasl.ht.HtSha256UniqueMechanism());
+        SASLAuthentication.registerSASLMechanism(new org.jivesoftware.smack.sasl.ht.HtSha512EndpointMechanism());
+        SASLAuthentication.registerSASLMechanism(new org.jivesoftware.smack.sasl.ht.HtSha512NoneMechanism());
+        SASLAuthentication.registerSASLMechanism(new org.jivesoftware.smack.sasl.ht.HtSha512ExporterMechanism());
+        SASLAuthentication.registerSASLMechanism(new org.jivesoftware.smack.sasl.ht.HtSha512UniqueMechanism());
+        SASLAuthentication.registerSASLMechanism(new org.jivesoftware.smack.sasl.ht.HtSha3_256EndpointMechanism());
+        SASLAuthentication.registerSASLMechanism(new org.jivesoftware.smack.sasl.ht.HtSha3_256NoneMechanism());
+        SASLAuthentication.registerSASLMechanism(new org.jivesoftware.smack.sasl.ht.HtSha3_256ExporterMechanism());
+        SASLAuthentication.registerSASLMechanism(new org.jivesoftware.smack.sasl.ht.HtSha3_256UniqueMechanism());
+        SASLAuthentication.registerSASLMechanism(new org.jivesoftware.smack.sasl.ht.HtSha3_512EndpointMechanism());
+        SASLAuthentication.registerSASLMechanism(new org.jivesoftware.smack.sasl.ht.HtSha3_512NoneMechanism());
+        SASLAuthentication.registerSASLMechanism(new org.jivesoftware.smack.sasl.ht.HtSha3_512ExporterMechanism());
+        SASLAuthentication.registerSASLMechanism(new org.jivesoftware.smack.sasl.ht.HtSha3_512UniqueMechanism());
+
         ProviderManager.addIQProvider(Bind.ELEMENT, Bind.NAMESPACE, new BindIQProvider());
         ProviderManager.addExtensionProvider(Message.Body.ELEMENT, Message.Body.NAMESPACE, new BodyElementProvider());
         ProviderManager.addExtensionProvider(Message.Thread.ELEMENT, Message.Thread.NAMESPACE, new MessageThreadElementProvider());
@@ -145,6 +162,7 @@ public final class SmackInitialization {
 
         SmackConfiguration.addModule(Bind2ModuleDescriptor.class);
         SmackConfiguration.addModule(Sasl2ModuleDescriptor.class);
+        SmackConfiguration.addModule(org.jivesoftware.smack.fast.FastModuleDescriptor.class);
         SmackConfiguration.addModule(CompressionModuleDescriptor.class);
         SmackConfiguration.addModule(InstantStreamResumptionModuleDescriptor.class);
 

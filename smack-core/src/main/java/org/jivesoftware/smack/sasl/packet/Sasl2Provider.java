@@ -48,7 +48,7 @@ public class Sasl2Provider {
                         JxmppContext jxmppContext)
                         throws XmlPullParserException, IOException, SmackParsingException, ParseException {
             List<String> mechanisms = new ArrayList<>();
-            List<XmlElement> inlineFeatures = new ArrayList<>();
+            Sasl2Feature.Inline inline = null;
 
             outerloop: while (true) {
                 XmlPullParser.Event eventType = parser.next();
@@ -57,9 +57,9 @@ public class Sasl2Provider {
                     String namespace = parser.getNamespace();
 
                     if ("mechanism".equals(name) && Sasl2Nonza.NAMESPACE.equals(namespace)) {
-                        mechanisms.add(parser.nextText());
+                        mechanisms.add(parser.nextText().trim());
                     } else if ("inline".equals(name) && Sasl2Nonza.NAMESPACE.equals(namespace)) {
-                        parseInlineFeatures(parser, parser.getDepth(), inlineFeatures, xmlEnvironment, jxmppContext);
+                        inline = InlineProvider.INSTANCE.parse(parser, parser.getDepth(), xmlEnvironment, jxmppContext);
                     }
                 } else if (eventType == XmlPullParser.Event.END_ELEMENT) {
                     if (parser.getDepth() == initialDepth) {
@@ -68,12 +68,22 @@ public class Sasl2Provider {
                 }
             }
 
-            return new Sasl2Feature(mechanisms, inlineFeatures);
+            return new Sasl2Feature(mechanisms, inline);
+        }
+    }
+
+    public static final class InlineProvider extends ExtensionElementProvider<Sasl2Feature.Inline> {
+
+        public static final InlineProvider INSTANCE = new InlineProvider();
+
+        private InlineProvider() {
         }
 
-        private static void parseInlineFeatures(XmlPullParser parser, int initialDepth, List<XmlElement> inlineFeatures,
-                        XmlEnvironment xmlEnvironment, JxmppContext jxmppContext)
+        @Override
+        public Sasl2Feature.Inline parse(XmlPullParser parser, int initialDepth, XmlEnvironment xmlEnvironment,
+                        JxmppContext jxmppContext)
                         throws XmlPullParserException, IOException, SmackParsingException {
+            List<XmlElement> inlineFeatures = new ArrayList<>();
             outerloop: while (true) {
                 XmlPullParser.Event eventType = parser.next();
                 if (eventType == XmlPullParser.Event.START_ELEMENT) {
@@ -88,8 +98,8 @@ public class Sasl2Provider {
                     }
                 }
             }
+            return new Sasl2Feature.Inline(inlineFeatures);
         }
-
     }
 
     public static final class AuthenticateProvider extends NonzaProvider<Sasl2Nonza.Authenticate> {

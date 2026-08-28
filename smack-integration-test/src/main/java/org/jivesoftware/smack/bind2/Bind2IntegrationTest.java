@@ -22,6 +22,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.jivesoftware.smack.bind2.Bind2Module.Bind2SuccessResult;
+import org.jivesoftware.smack.bind2.element.Bind2Elements;
 import org.jivesoftware.smack.c2s.ModularXmppClientToServerConnection;
 import org.jivesoftware.smack.sasl.packet.Sasl2Feature;
 import org.jivesoftware.smack.util.StringUtils;
@@ -44,7 +45,7 @@ public class Bind2IntegrationTest extends AbstractSmackSpecificLowLevelIntegrati
         try {
             connection.connect();
             var sasl2Feature = connection.getFeature(Sasl2Feature.class);
-            if (sasl2Feature == null || !sasl2Feature.hasBind2()) {
+            if (sasl2Feature == null || !sasl2Feature.hasInlineFeature(Bind2Elements.Bind.class)) {
                 throw new TestNotPossibleException("XEP-0386: Bind 2 (Bind2) not supported by service");
             }
         } finally {
@@ -72,6 +73,7 @@ public class Bind2IntegrationTest extends AbstractSmackSpecificLowLevelIntegrati
             Bind2SuccessResult bind2SuccessResult = bind2Module.getBind2SuccessResult();
             assertNotNull(bind2SuccessResult, "Bind2SuccessResult should not be null");
             assertNotNull(bind2SuccessResult.getBound(), "Bound element in Bind2SuccessResult should not be null");
+            assertNotNull(bind2SuccessResult.getSuccessNonza(), "Success nonza in Bind2SuccessResult should not be null");
             assertEquals(connection.getUser().getResourcepart(), bind2SuccessResult.getBoundResource());
             assertEquals(requestedResource, bind2SuccessResult.getRequestedResource());
         } finally {
@@ -98,6 +100,7 @@ public class Bind2IntegrationTest extends AbstractSmackSpecificLowLevelIntegrati
             Bind2SuccessResult bind2SuccessResult = bind2Module.getBind2SuccessResult();
             assertNotNull(bind2SuccessResult, "Bind2SuccessResult should not be null");
             assertNotNull(bind2SuccessResult.getBound(), "Bound element in Bind2SuccessResult should not be null");
+            assertNotNull(bind2SuccessResult.getSuccessNonza(), "Success nonza in Bind2SuccessResult should not be null");
             assertEquals(connection.getUser().getResourcepart(), bind2SuccessResult.getBoundResource());
             assertNull(bind2SuccessResult.getRequestedResource(), "Expected requestedResource to be null for server-generated resource");
         } finally {

@@ -32,6 +32,7 @@ import org.jivesoftware.smack.sasl.SASLError;
 import org.jivesoftware.smack.util.Objects;
 import org.jivesoftware.smack.util.StringUtils;
 import org.jivesoftware.smack.util.XmlStringBuilder;
+import org.jivesoftware.smack.util.XmppElementUtil;
 
 public interface Sasl2Nonza extends Nonza {
     String NAMESPACE = "urn:xmpp:sasl:2";
@@ -133,6 +134,41 @@ public interface Sasl2Nonza extends Nonza {
 
         public List<XmlElement> getExtensionElements() {
             return extensionElements;
+        }
+
+        public boolean hasExtension(Class<? extends ExtensionElement> extensionElementClass) {
+            return getExtension(extensionElementClass) != null;
+        }
+
+        public boolean hasExtension(QName qname) {
+            return getExtension(qname) != null;
+        }
+
+        public <E extends ExtensionElement> E getExtension(Class<E> extensionElementClass) {
+            return XmppElementUtil.from(extensionElements, extensionElementClass);
+        }
+
+        public XmlElement getExtension(QName qname) {
+            for (XmlElement element : extensionElements) {
+                if (qname.equals(element.getQName())) {
+                    return element;
+                }
+            }
+            return null;
+        }
+
+        public <E extends ExtensionElement> List<E> getExtensions(Class<E> extensionElementClass) {
+            return XmppElementUtil.getElementsFrom(extensionElements, extensionElementClass);
+        }
+
+        public List<XmlElement> getExtensions(QName qname) {
+            List<XmlElement> res = new ArrayList<>();
+            for (XmlElement element : extensionElements) {
+                if (qname.equals(element.getQName())) {
+                    res.add(element);
+                }
+            }
+            return Collections.unmodifiableList(res);
         }
 
         @Override
@@ -239,6 +275,41 @@ public interface Sasl2Nonza extends Nonza {
 
         public List<XmlElement> getExtensionElements() {
             return extensionElements;
+        }
+
+        public boolean hasExtension(Class<? extends ExtensionElement> extensionElementClass) {
+            return getExtension(extensionElementClass) != null;
+        }
+
+        public boolean hasExtension(QName qname) {
+            return getExtension(qname) != null;
+        }
+
+        public <E extends ExtensionElement> E getExtension(Class<E> extensionElementClass) {
+            return XmppElementUtil.from(extensionElements, extensionElementClass);
+        }
+
+        public XmlElement getExtension(QName qname) {
+            for (XmlElement element : extensionElements) {
+                if (qname.equals(element.getQName())) {
+                    return element;
+                }
+            }
+            return null;
+        }
+
+        public <E extends ExtensionElement> List<E> getExtensions(Class<E> extensionElementClass) {
+            return XmppElementUtil.getElementsFrom(extensionElements, extensionElementClass);
+        }
+
+        public List<XmlElement> getExtensions(QName qname) {
+            List<XmlElement> res = new ArrayList<>();
+            for (XmlElement element : extensionElements) {
+                if (qname.equals(element.getQName())) {
+                    res.add(element);
+                }
+            }
+            return Collections.unmodifiableList(res);
         }
 
         @Override
