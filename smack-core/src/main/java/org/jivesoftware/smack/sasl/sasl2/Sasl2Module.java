@@ -121,6 +121,7 @@ public class Sasl2Module extends ModularXmppClientToServerConnectionModule<Sasl2
                         sasl2Extensions.add(new org.jivesoftware.smack.fast.element.FastElements.RequestToken(prefMech));
                     }
                 }
+                sasl2Extensions.add(new org.jivesoftware.smack.sasl.packet.Sasl2Nonza.UserAgent("smack-client-instance", "Smack", null));
             }
 
             if (!useBind2) {

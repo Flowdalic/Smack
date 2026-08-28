@@ -51,6 +51,10 @@ import org.jivesoftware.smack.sasl.core.SASLAnonymous;
 import org.jivesoftware.smack.sasl.core.SASLXOauth2Mechanism;
 import org.jivesoftware.smack.sasl.core.SCRAMSHA1Mechanism;
 import org.jivesoftware.smack.sasl.core.ScramSha1PlusMechanism;
+import org.jivesoftware.smack.sasl.core.ScramSha256Mechanism;
+import org.jivesoftware.smack.sasl.core.ScramSha256PlusMechanism;
+import org.jivesoftware.smack.sasl.core.ScramSha512Mechanism;
+import org.jivesoftware.smack.sasl.core.ScramSha512PlusMechanism;
 import org.jivesoftware.smack.sasl.sasl2.Sasl2ModuleDescriptor;
 import org.jivesoftware.smack.util.CloseableUtil;
 import org.jivesoftware.smack.util.FileUtils;
@@ -125,6 +129,10 @@ public final class SmackInitialization {
             LOGGER.log(Level.FINE, "Could not handle debugEnable property on Smack initialization", e);
         }
 
+        SASLAuthentication.registerSASLMechanism(new ScramSha512Mechanism());
+        SASLAuthentication.registerSASLMechanism(new ScramSha512PlusMechanism());
+        SASLAuthentication.registerSASLMechanism(new ScramSha256Mechanism());
+        SASLAuthentication.registerSASLMechanism(new ScramSha256PlusMechanism());
         SASLAuthentication.registerSASLMechanism(new SCRAMSHA1Mechanism());
         SASLAuthentication.registerSASLMechanism(new ScramSha1PlusMechanism());
         SASLAuthentication.registerSASLMechanism(new SASLXOauth2Mechanism());

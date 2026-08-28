@@ -22,7 +22,7 @@ public class HtSha512UniqueMechanism extends SaslHtMechanism {
     public static final String NAME = "HT-SHA-512-UNIQ";
 
     public HtSha512UniqueMechanism() {
-        super(HashAlgorithm.SHA_512, ChannelBindingType.UNIQ, 65);
+        super(HashAlgorithm.SHA_512, ChannelBindingType.UNIQ, 62);
     }
 
     @Override

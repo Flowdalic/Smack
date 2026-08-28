@@ -14,19 +14,30 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.jivesoftware.smack.sasl.ht;
+package org.jivesoftware.smack.sasl.core;
 
 import org.jivesoftware.smack.sasl.SASLMechanism;
 
-public class HtSha256NoneMechanism extends SaslHtMechanism {
-    public static final String NAME = "HT-SHA-256-NONE";
+public class ScramSha256PlusMechanism extends ScramPlusMechanism {
 
-    public HtSha256NoneMechanism() {
-        super(HashAlgorithm.SHA_256, ChannelBindingType.NONE, 65);
+    static {
+        NAME = new ScramSha256PlusMechanism().getName();
+    }
+
+    public static final String NAME;
+
+    public ScramSha256PlusMechanism() {
+        super(ScramSha256Mechanism.SHA_256_SCRAM_HMAC);
+    }
+
+    @Override
+    public int getPriority() {
+        return ScramSha256Mechanism.PRIORITY - 10;
     }
 
     @Override
     protected SASLMechanism newInstance() {
-        return new HtSha256NoneMechanism();
+        return new ScramSha256PlusMechanism();
     }
+
 }

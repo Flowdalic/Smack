@@ -22,7 +22,7 @@ public class HtSha3_256NoneMechanism extends SaslHtMechanism {
     public static final String NAME = "HT-SHA3-256-NONE";
 
     public HtSha3_256NoneMechanism() {
-        super(HashAlgorithm.SHA3_256, ChannelBindingType.NONE, 80);
+        super(HashAlgorithm.SHA3_256, ChannelBindingType.NONE, 65);
     }
 
     @Override

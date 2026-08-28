@@ -164,18 +164,37 @@ public class TLSUtils {
                     throws SSLPeerUnverifiedException, CertificateEncodingException, NoSuchAlgorithmException {
         final Certificate[] peerCertificates = sslSession.getPeerCertificates();
         final Certificate certificate = peerCertificates[0];
-        final String certificateAlgorithm = certificate.getPublicKey().getAlgorithm();
 
-        // RFC 5929 § 4.1 hash function selection.
-        String algorithm;
-        switch (certificateAlgorithm) {
-        case "MD5":
-        case "SHA-1":
-            algorithm = "SHA-256";
-            break;
-        default:
-            algorithm = certificateAlgorithm;
-            break;
+        // RFC 5929 § 4.1 hash function selection based on certificate's signature algorithm.
+        String algorithm = "SHA-256";
+        if (certificate instanceof X509Certificate) {
+            String sigAlgName = ((X509Certificate) certificate).getSigAlgName().toUpperCase(java.util.Locale.US);
+            String digestPart = sigAlgName.contains("WITH") ? sigAlgName.substring(0, sigAlgName.indexOf("WITH")) : sigAlgName;
+            switch (digestPart) {
+            case "SHA256":
+            case "SHA-256":
+                algorithm = "SHA-256";
+                break;
+            case "SHA384":
+            case "SHA-384":
+                algorithm = "SHA-384";
+                break;
+            case "SHA512":
+            case "SHA-512":
+                algorithm = "SHA-512";
+                break;
+            case "SHA224":
+            case "SHA-224":
+                algorithm = "SHA-224";
+                break;
+            case "SHA1":
+            case "SHA-1":
+            case "MD5":
+            case "MD2":
+            default:
+                algorithm = "SHA-256";
+                break;
+            }
         }
 
         final MessageDigest messageDigest = MessageDigest.getInstance(algorithm);

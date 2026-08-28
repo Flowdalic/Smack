@@ -22,7 +22,7 @@ public class HtSha3_256UniqueMechanism extends SaslHtMechanism {
     public static final String NAME = "HT-SHA3-256-UNIQ";
 
     public HtSha3_256UniqueMechanism() {
-        super(HashAlgorithm.SHA3_256, ChannelBindingType.UNIQ, 65);
+        super(HashAlgorithm.SHA3_256, ChannelBindingType.UNIQ, 62);
     }
 
     @Override

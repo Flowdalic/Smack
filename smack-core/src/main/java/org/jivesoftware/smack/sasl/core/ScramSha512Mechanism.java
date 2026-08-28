@@ -1,6 +1,6 @@
 /*
  *
- * Copyright 2014-2017 Florian Schmaus
+ * Copyright 2026 Florian Schmaus
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,39 +17,44 @@
 package org.jivesoftware.smack.sasl.core;
 
 import java.security.InvalidKeyException;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 
 import org.jivesoftware.smack.sasl.SASLMechanism;
 import org.jivesoftware.smack.util.MAC;
-import org.jivesoftware.smack.util.SHA1;
 
-public class SCRAMSHA1Mechanism extends ScramMechanism {
+public class ScramSha512Mechanism extends ScramMechanism {
 
-    static final int PRIORITY = 110;
+    static final int PRIORITY = 80;
 
     static {
-        SHA_1_SCRAM_HMAC = new ScramHmac() {
+        SHA_512_SCRAM_HMAC = new ScramHmac() {
             @Override
             public String getHmacName() {
-                return "SHA-1";
+                return "SHA-512";
             }
             @Override
             public byte[] hmac(byte[] key, byte[] str) throws InvalidKeyException {
-                return MAC.hmacsha1(key, str);
+                return MAC.hmacsha512(key, str);
             }
             @Override
             public byte[] h(byte[] str) {
-                return SHA1.bytes(str);
+                try {
+                    return MessageDigest.getInstance("SHA-512").digest(str);
+                } catch (NoSuchAlgorithmException e) {
+                    throw new AssertionError("SHA-512 must be supported on JVM", e);
+                }
             }
         };
-        NAME = new SCRAMSHA1Mechanism().getName();
+        NAME = new ScramSha512Mechanism().getName();
     }
 
     public static final String NAME;
 
-    static final ScramHmac SHA_1_SCRAM_HMAC;
+    static final ScramHmac SHA_512_SCRAM_HMAC;
 
-    public SCRAMSHA1Mechanism() {
-        super(SHA_1_SCRAM_HMAC);
+    public ScramSha512Mechanism() {
+        super(SHA_512_SCRAM_HMAC);
     }
 
     @Override
@@ -59,7 +64,7 @@ public class SCRAMSHA1Mechanism extends ScramMechanism {
 
     @Override
     protected SASLMechanism newInstance() {
-        return new SCRAMSHA1Mechanism();
+        return new ScramSha512Mechanism();
     }
 
 }

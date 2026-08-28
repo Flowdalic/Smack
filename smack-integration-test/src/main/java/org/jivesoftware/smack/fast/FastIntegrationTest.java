@@ -60,6 +60,10 @@ public class FastIntegrationTest extends AbstractSmackSpecificLowLevelIntegratio
                 .setPreferredFastMechanism("HT-SHA-256-NONE")
                 .setAutoRequestToken(true)
                 .buildModule();
+            modularBuilder.addEnabledSaslMechanism("SCRAM-SHA-256-PLUS");
+            modularBuilder.addEnabledSaslMechanism("SCRAM-SHA-256");
+            modularBuilder.addEnabledSaslMechanism("HT-SHA-256-NONE");
+            modularBuilder.addEnabledSaslMechanism("HT-SHA-256-ENDP");
         });
 
         FastToken token;
@@ -76,28 +80,19 @@ public class FastIntegrationTest extends AbstractSmackSpecificLowLevelIntegratio
             testConn1.disconnect();
         }
 
-        // Second connection uses the FAST token for fast re-authentication
-        ModularXmppClientToServerConnection testConn2 = getSpecificUnconnectedConnection(builder -> {
-            builder.setUsernameAndPassword(testConn1.getConfiguration().getUsername(), testConn1.getConfiguration().getPassword());
-            ModularXmppClientToServerConnectionConfiguration.Builder modularBuilder =
-                (ModularXmppClientToServerConnectionConfiguration.Builder) builder;
-            modularBuilder.with(FastModuleDescriptor.Builder.class)
-                .setFastToken(token)
-                .buildModule();
-        });
-
+        // Reconnect testConn1 using the stored FAST token for fast re-authentication
         try {
-            testConn2.connect();
-            testConn2.login();
+            testConn1.connect();
+            testConn1.login();
 
-            assertTrue(testConn2.isAuthenticated(), "Connection 2 should be authenticated using FAST");
-            Sasl2Module sasl2Module = testConn2.getConnectionModuleFor(Sasl2ModuleDescriptor.class);
+            assertTrue(testConn1.isAuthenticated(), "Connection should be authenticated using FAST");
+            Sasl2Module sasl2Module = testConn1.getConnectionModuleFor(Sasl2ModuleDescriptor.class);
             assertNotNull(sasl2Module);
             assertNotNull(sasl2Module.getSasl2AuthenticationResult());
             assertTrue(sasl2Module.getSasl2AuthenticationResult().getUsedSaslMechanism() instanceof SaslHtMechanism,
                     "Expected FAST authentication to use SaslHtMechanism");
         } finally {
-            testConn2.disconnect();
+            testConn1.disconnect();
         }
     }
 

@@ -188,8 +188,7 @@ public abstract class SaslHtMechanism extends SASLMechanism {
 
         byte[] authcidBytes = authenticationId.getBytes(StandardCharsets.UTF_8);
         state = State.AUTH_SENT;
-        // initiator-msg = authcid NUL extra-initiator-values NUL initiator-hashed-token
-        return ByteUtils.concat(authcidBytes, new byte[] { 0, 0 }, initiatorHashedToken);
+        return ByteUtils.concat(authcidBytes, new byte[] { 0 }, initiatorHashedToken);
     }
 
     @Override

@@ -193,7 +193,7 @@ public abstract class ScramMechanism extends SASLMechanism {
             serverSignature = hmac(serverKey, authMessage);
 
             // StoredKey := H(ClientKey)
-            byte[] storedKey = SHA1.bytes(clientKey);
+            byte[] storedKey = scramHmac.h(clientKey);
 
             // ClientSignature := HMAC(StoredKey, AuthMessage)
             byte[] clientSignature = hmac(storedKey, authMessage);
