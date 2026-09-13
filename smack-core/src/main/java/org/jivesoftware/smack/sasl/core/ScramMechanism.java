@@ -29,7 +29,6 @@ import javax.security.auth.callback.CallbackHandler;
 import org.jivesoftware.smack.SmackException.SmackSaslException;
 import org.jivesoftware.smack.sasl.SASLMechanism;
 import org.jivesoftware.smack.util.ByteUtils;
-import org.jivesoftware.smack.util.SHA1;
 import org.jivesoftware.smack.util.StringUtils;
 import org.jivesoftware.smack.util.stringencoder.Base64;
 

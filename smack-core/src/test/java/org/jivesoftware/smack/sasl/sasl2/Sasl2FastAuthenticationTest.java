@@ -76,9 +76,7 @@ import org.jivesoftware.smack.xml.XmlPullParser;
 
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
-import org.jxmpp.jid.DomainBareJid;
 import org.jxmpp.jid.EntityFullJid;
-import org.jxmpp.jid.impl.JidCreate;
 import org.jxmpp.jid.parts.Resourcepart;
 
 public class Sasl2FastAuthenticationTest extends SmackTestSuite {

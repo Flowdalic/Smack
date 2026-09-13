@@ -36,8 +36,6 @@ import org.jivesoftware.smack.sasl.SASLMechanism;
 import org.jivesoftware.smack.util.ByteUtils;
 import org.jivesoftware.smack.util.TLSUtils;
 
-import org.jxmpp.jid.DomainBareJid;
-
 public abstract class SaslHtMechanism extends SASLMechanism {
 
     public enum HashAlgorithm {
