@@ -18,6 +18,7 @@ package org.jivesoftware.smack.sasl.sasl2;
 
 import java.io.IOException;
 import java.util.List;
+import java.util.UUID;
 
 import org.jivesoftware.smack.SmackException;
 import org.jivesoftware.smack.XMPPException;
@@ -40,6 +41,21 @@ import org.jivesoftware.smack.sasl.sasl2.Sasl2Authentication.Sasl2Authentication
 public class Sasl2Module extends ModularXmppClientToServerConnectionModule<Sasl2ModuleDescriptor> {
 
     private Sasl2AuthenticationResult sasl2AuthenticationResult;
+
+    /**
+     * A stable identifier for this connection's "client installation", per XEP-0388 § 2.3: "The contents of the
+     * 'id' attribute MUST be a UUID v4." Generated once per {@link Sasl2Module} instance (i.e. once per connection
+     * object) rather than fresh on every authentication attempt, since a FAST (XEP-0484) token requested under one
+     * id can only be redeemed under that same id: servers key stored tokens by (username, mechanism, clientId).
+     */
+    private final String userAgentId = UUID.randomUUID().toString();
+
+    /**
+     * Returns this connection's stable SASL2 {@code <user-agent/>} 'id' value (see {@link #userAgentId}).
+     */
+    public String getUserAgentId() {
+        return userAgentId;
+    }
 
     protected Sasl2Module(Sasl2ModuleDescriptor moduleDescriptor,
                     ModularXmppClientToServerConnectionInternal connectionInternal) {
@@ -121,7 +137,8 @@ public class Sasl2Module extends ModularXmppClientToServerConnectionModule<Sasl2
                         sasl2Extensions.add(new org.jivesoftware.smack.fast.element.FastElements.RequestToken(prefMech));
                     }
                 }
-                sasl2Extensions.add(new org.jivesoftware.smack.sasl.packet.Sasl2Nonza.UserAgent("smack-client-instance", "Smack", null));
+                Sasl2Module sasl2Module = connectionInternal.connection.getConnectionModuleFor(Sasl2ModuleDescriptor.class);
+                sasl2Extensions.add(new org.jivesoftware.smack.sasl.packet.Sasl2Nonza.UserAgent(sasl2Module.userAgentId, "Smack", null));
             }
 
             if (!useBind2) {
