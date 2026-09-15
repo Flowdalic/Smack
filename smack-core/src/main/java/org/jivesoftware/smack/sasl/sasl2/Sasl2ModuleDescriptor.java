@@ -25,9 +25,10 @@ import org.jivesoftware.smack.c2s.internal.ModularXmppClientToServerConnectionIn
 import org.jivesoftware.smack.fsm.StateDescriptor;
 import org.jivesoftware.smack.provider.ProviderManager;
 import org.jivesoftware.smack.sasl.packet.Sasl2Feature;
+import org.jivesoftware.smack.sasl.packet.Sasl2Nonza;
 import org.jivesoftware.smack.sasl.packet.Sasl2Provider;
 
-public class Sasl2ModuleDescriptor extends ModularXmppClientToServerConnectionModuleDescriptor {
+public final class Sasl2ModuleDescriptor extends ModularXmppClientToServerConnectionModuleDescriptor {
 
     static {
         ProviderManager.addStreamFeatureProvider(Sasl2Feature.QNAME, Sasl2Provider.Sasl2FeatureProvider.INSTANCE);
@@ -43,7 +44,19 @@ public class Sasl2ModuleDescriptor extends ModularXmppClientToServerConnectionMo
         ProviderManager.addNonzaProvider(Sasl2Provider.TaskDataProvider.INSTANCE);
     }
 
-    private static final Sasl2ModuleDescriptor INSTANCE = new Sasl2ModuleDescriptor();
+    private final Sasl2Nonza.UserAgent userAgent;
+
+    private Sasl2ModuleDescriptor() {
+        this(new Sasl2Nonza.UserAgent(Sasl2Nonza.UserAgent.DEFAULT_SOFTWARE, null));
+    }
+
+    private Sasl2ModuleDescriptor(Sasl2Nonza.UserAgent userAgent) {
+        this.userAgent = userAgent != null ? userAgent : new Sasl2Nonza.UserAgent(Sasl2Nonza.UserAgent.DEFAULT_SOFTWARE, null);
+    }
+
+    public Sasl2Nonza.UserAgent getUserAgent() {
+        return userAgent;
+    }
 
     @Override
     protected Set<Class<? extends StateDescriptor>> getStateDescriptors() {
@@ -58,13 +71,35 @@ public class Sasl2ModuleDescriptor extends ModularXmppClientToServerConnectionMo
 
     public static class Builder extends ModularXmppClientToServerConnectionModuleDescriptor.Builder {
 
+        private Sasl2Nonza.UserAgent userAgent;
+
         protected Builder(ModularXmppClientToServerConnectionConfiguration.Builder connectionConfigurationBuilder) {
             super(connectionConfigurationBuilder);
         }
 
+        public Builder setUserAgent(Sasl2Nonza.UserAgent userAgent) {
+            this.userAgent = userAgent;
+            return this;
+        }
+
+        public Builder setUserAgent(String software, String device) {
+            this.userAgent = new Sasl2Nonza.UserAgent(software, device);
+            return this;
+        }
+
+        public Builder setUserAgent(java.util.UUID id, String software, String device) {
+            this.userAgent = new Sasl2Nonza.UserAgent(id, software, device);
+            return this;
+        }
+
+        public Builder setUserAgent(String id, String software, String device) {
+            this.userAgent = new Sasl2Nonza.UserAgent(id, software, device);
+            return this;
+        }
+
         @Override
         protected Sasl2ModuleDescriptor build() {
-            return INSTANCE;
+            return new Sasl2ModuleDescriptor(userAgent);
         }
     }
 }

@@ -41,7 +41,6 @@ import javax.net.ssl.SSLSocket;
 import javax.net.ssl.X509TrustManager;
 
 import org.jivesoftware.smack.ConnectionConfiguration;
-import org.jivesoftware.smack.SmackException;
 import org.jivesoftware.smack.SmackException.SecurityNotPossibleException;
 
 
@@ -203,39 +202,6 @@ public class TLSUtils {
         return messageDigest.digest();
     }
 
-    /**
-     * Get the channel binding data for the 'tls-exporter' channel binding type as defined in RFC 9266.
-     *
-     * @param sslSession the SSL/TLS session from which the data should be retrieved.
-     * @return the channel binding data.
-     * @throws SmackException.SmackSaslException if tls-exporter is not supported by the underlying TLS provider.
-     */
-    @SuppressWarnings("DoNotCallSuggester")
-    public static byte[] getChannelBindingTlsExporter(final SSLSession sslSession) throws SmackException.SmackSaslException {
-        if (sslSession == null) {
-            throw new IllegalArgumentException("SSLSession must not be null");
-        }
-        // RFC 9266 defines tls-exporter using label "EXPORTER-Channel-Binding", empty context, and length 32 octets.
-        // Standard Java JSSE (javax.net.ssl) does not expose RFC 5705/8446 key exporter API.
-        throw new SmackException.SmackSaslException("Channel binding type 'tls-exporter' (RFC 9266) is not supported by the current TLS provider");
-    }
-
-    /**
-     * Get the channel binding data for the 'tls-unique' channel binding type as defined in RFC 5929 § 3.
-     *
-     * @param sslSession the SSL/TLS session from which the data should be retrieved.
-     * @return the channel binding data.
-     * @throws SmackException.SmackSaslException if tls-unique is not supported by the underlying TLS provider.
-     */
-    @SuppressWarnings("DoNotCallSuggester")
-    public static byte[] getChannelBindingTlsUnique(final SSLSession sslSession) throws SmackException.SmackSaslException {
-        if (sslSession == null) {
-            throw new IllegalArgumentException("SSLSession must not be null");
-        }
-        // Standard Java JSSE (javax.net.ssl) does not expose raw TLS Finished message data.
-        throw new SmackException.SmackSaslException("Channel binding type 'tls-unique' (RFC 5929 § 3) is not supported by the current TLS provider");
-    }
-
     public static boolean isChannelBindingTlsServerEndPointSupported(final SSLSession sslSession) {
         if (sslSession == null) return false;
         try {
@@ -243,14 +209,6 @@ public class TLSUtils {
         } catch (SSLPeerUnverifiedException e) {
             return false;
         }
-    }
-
-    public static boolean isChannelBindingTlsExporterSupported(final SSLSession sslSession) {
-        return false;
-    }
-
-    public static boolean isChannelBindingTlsUniqueSupported(final SSLSession sslSession) {
-        return false;
     }
 
 

@@ -70,6 +70,7 @@ public class FastModule extends ModularXmppClientToServerConnectionModule<FastMo
 
     public synchronized void setFastToken(FastToken fastToken) {
         this.fastToken = fastToken;
+        this.invalidateToken = false;
         if (fastToken != null) {
             for (FastTokenListener listener : fastTokenListeners) {
                 listener.onFastTokenReceived(fastToken);
@@ -83,6 +84,7 @@ public class FastModule extends ModularXmppClientToServerConnectionModule<FastMo
 
     public synchronized void deleteFastToken() {
         this.fastToken = null;
+        this.invalidateToken = false;
         for (FastTokenListener listener : fastTokenListeners) {
             listener.onFastTokenInvalidated();
         }

@@ -36,8 +36,6 @@ import org.jivesoftware.smack.sasl.SASLMechanism;
 import org.jivesoftware.smack.util.ByteUtils;
 import org.jivesoftware.smack.util.TLSUtils;
 
-import org.jxmpp.jid.DomainBareJid;
-
 public abstract class SaslHtMechanism extends SASLMechanism {
 
     public enum HashAlgorithm {
@@ -65,9 +63,7 @@ public abstract class SaslHtMechanism extends SASLMechanism {
 
     public enum ChannelBindingType {
         NONE("NONE"),
-        ENDP("ENDP"),
-        UNIQ("UNIQ"),
-        EXPR("EXPR");
+        ENDP("ENDP");
 
         private final String suffix;
 
@@ -147,10 +143,6 @@ public abstract class SaslHtMechanism extends SASLMechanism {
                 return "channel binding type 'tls-server-end-point' (RFC 5929) requires a secure (TLS) connection";
             }
             return null;
-        case EXPR:
-            return "channel binding type 'tls-exporter' (RFC 9266) is currently not supported by Smack";
-        case UNIQ:
-            return "channel binding type 'tls-unique' (RFC 5929) is currently not supported by Smack";
         default:
             return "unsupported channel binding type: " + channelBindingType;
         }
@@ -186,6 +178,9 @@ public abstract class SaslHtMechanism extends SASLMechanism {
         byte[] initiatorData = ByteUtils.concat(INITIATOR_PREFIX, cbData);
         byte[] initiatorHashedToken = computeHmac(tokenBytes, initiatorData);
 
+        if (org.jivesoftware.smack.util.StringUtils.isNullOrEmpty(authenticationId)) {
+            throw new SmackSaslException("No authenticationId (username) provided for SASL-HT mechanism " + getName());
+        }
         byte[] authcidBytes = authenticationId.getBytes(StandardCharsets.UTF_8);
         state = State.AUTH_SENT;
         return ByteUtils.concat(authcidBytes, new byte[] { 0 }, initiatorHashedToken);
@@ -225,10 +220,6 @@ public abstract class SaslHtMechanism extends SASLMechanism {
             } catch (Exception e) {
                 throw new SmackSaslException("Failed to obtain tls-server-end-point channel binding data", e);
             }
-        case EXPR:
-            return TLSUtils.getChannelBindingTlsExporter(sslSession);
-        case UNIQ:
-            return TLSUtils.getChannelBindingTlsUnique(sslSession);
         default:
             throw new SmackSaslException("Unsupported channel binding type: " + channelBindingType);
         }

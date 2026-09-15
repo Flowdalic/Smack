@@ -22,7 +22,7 @@ public class HtSha256EndpointMechanism extends SaslHtMechanism {
     public static final String NAME = "HT-SHA-256-ENDP";
 
     public HtSha256EndpointMechanism() {
-        super(HashAlgorithm.SHA_256, ChannelBindingType.ENDP, 60);
+        super(HashAlgorithm.SHA_256, ChannelBindingType.ENDP, 61);
     }
 
     @Override

@@ -90,6 +90,23 @@ public final class SASLAuthentication {
         }
     }
 
+    public static List<SASLMechanism> getRegisteredSASLMechanisms() {
+        synchronized (REGISTERED_MECHANISMS) {
+            return new ArrayList<>(REGISTERED_MECHANISMS);
+        }
+    }
+
+    public static SASLMechanism getRegisteredSASLMechanism(String mechanismName) {
+        synchronized (REGISTERED_MECHANISMS) {
+            for (SASLMechanism mechanism : REGISTERED_MECHANISMS) {
+                if (mechanism.getName().equals(mechanismName)) {
+                    return mechanism;
+                }
+            }
+        }
+        return null;
+    }
+
     /**
      * Returns the registered SASLMechanism sorted by the level of preference.
      *

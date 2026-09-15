@@ -22,7 +22,7 @@ public class HtSha512EndpointMechanism extends SaslHtMechanism {
     public static final String NAME = "HT-SHA-512-ENDP";
 
     public HtSha512EndpointMechanism() {
-        super(HashAlgorithm.SHA_512, ChannelBindingType.ENDP, 60);
+        super(HashAlgorithm.SHA_512, ChannelBindingType.ENDP, 51);
     }
 
     @Override

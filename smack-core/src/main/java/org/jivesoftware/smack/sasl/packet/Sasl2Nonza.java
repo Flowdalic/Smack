@@ -47,6 +47,8 @@ public interface Sasl2Nonza extends Nonza {
         public static final String NAMESPACE = Sasl2Nonza.NAMESPACE;
         public static final QName QNAME = new QName(NAMESPACE, ELEMENT);
 
+        public static final String DEFAULT_SOFTWARE = "Smack";
+
         private final String id;
         private final String software;
         private final String device;
@@ -55,6 +57,14 @@ public interface Sasl2Nonza extends Nonza {
             this.id = id;
             this.software = software;
             this.device = device;
+        }
+
+        public UserAgent(java.util.UUID id, String software, String device) {
+            this(id != null ? id.toString() : null, software, device);
+        }
+
+        public UserAgent(String software, String device) {
+            this(java.util.UUID.randomUUID().toString(), software, device);
         }
 
         @Override

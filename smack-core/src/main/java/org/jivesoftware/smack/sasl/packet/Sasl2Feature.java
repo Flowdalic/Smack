@@ -64,10 +64,10 @@ public class Sasl2Feature implements ExtensionElement {
         if (fast == null || fast.getMechanisms() == null || fast.getMechanisms().isEmpty()) {
             return mechanisms;
         }
-        List<String> all = new ArrayList<>(mechanisms.size() + fast.getMechanisms().size());
+        java.util.Set<String> all = new java.util.LinkedHashSet<>(mechanisms.size() + fast.getMechanisms().size());
         all.addAll(mechanisms);
         all.addAll(fast.getMechanisms());
-        return all;
+        return new ArrayList<>(all);
     }
 
     public boolean isMechanismAvailable(String mechanism) {

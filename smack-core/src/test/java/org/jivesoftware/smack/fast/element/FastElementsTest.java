@@ -40,7 +40,7 @@ public class FastElementsTest {
     @Test
     public void testFastFeatureSerialization() throws Exception {
         FastElements.Fast fast = new FastElements.Fast(
-            Arrays.asList("HT-SHA-256-ENDP", "HT-SHA-256-EXPR", "HT-SHA-256-NONE"),
+            Arrays.asList("HT-SHA-256-ENDP", "HT-SHA-512-ENDP", "HT-SHA-256-NONE"),
             true
         );
 
@@ -48,7 +48,7 @@ public class FastElementsTest {
         assertXmlSimilar(
             "<fast xmlns='urn:xmpp:fast:0' tls-0rtt='true'>" +
             "<mechanism>HT-SHA-256-ENDP</mechanism>" +
-            "<mechanism>HT-SHA-256-EXPR</mechanism>" +
+            "<mechanism>HT-SHA-512-ENDP</mechanism>" +
             "<mechanism>HT-SHA-256-NONE</mechanism>" +
             "</fast>",
             xml

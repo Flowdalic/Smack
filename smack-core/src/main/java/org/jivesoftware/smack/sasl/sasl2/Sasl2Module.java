@@ -35,6 +35,7 @@ import org.jivesoftware.smack.fsm.State;
 import org.jivesoftware.smack.fsm.StateDescriptor;
 import org.jivesoftware.smack.fsm.StateTransitionResult;
 import org.jivesoftware.smack.sasl.packet.Sasl2Feature;
+import org.jivesoftware.smack.sasl.packet.Sasl2Nonza;
 import org.jivesoftware.smack.sasl.sasl2.Sasl2Authentication.Sasl2AuthenticationResult;
 
 public class Sasl2Module extends ModularXmppClientToServerConnectionModule<Sasl2ModuleDescriptor> {
@@ -103,25 +104,36 @@ public class Sasl2Module extends ModularXmppClientToServerConnectionModule<Sasl2
                 sasl2Extensions.add(new Bind2Elements.Bind(tag, null));
             }
 
+            Sasl2Module sasl2Module = connectionInternal.connection.getConnectionModuleFor(Sasl2ModuleDescriptor.class);
+            Sasl2Nonza.UserAgent userAgent = (sasl2Module != null && sasl2Module.getModuleDescriptor() != null)
+                            ? sasl2Module.getModuleDescriptor().getUserAgent()
+                            : new Sasl2Nonza.UserAgent(Sasl2Nonza.UserAgent.DEFAULT_SOFTWARE, null);
+            sasl2Extensions.add(userAgent);
+
             org.jivesoftware.smack.fast.FastModule fastModule = connectionInternal.connection.getConnectionModuleFor(
                 org.jivesoftware.smack.fast.FastModuleDescriptor.class);
             if (fastModule != null && fastModule.isEnabled()) {
                 org.jivesoftware.smack.fast.FastToken token = fastModule.getFastToken();
+                boolean isTokenUsable = false;
                 if (token != null && !token.isExpired() && sasl2Feature.isMechanismAvailable(token.getMechanism())) {
+                    org.jivesoftware.smack.sasl.SASLMechanism mech = org.jivesoftware.smack.SASLAuthentication.getRegisteredSASLMechanism(token.getMechanism());
+                    if (mech != null) {
+                        String skipReason = fastModule.getSkipReason(mech, connectionInternal.connection.getConfiguration());
+                        if (skipReason == null) {
+                            isTokenUsable = true;
+                        }
+                    }
+                }
+
+                if (isTokenUsable) {
                     long count = fastModule.incrementTokenCount();
                     sasl2Extensions.add(new org.jivesoftware.smack.fast.element.FastElements.Fast(count > 0 ? count : null, fastModule.isInvalidateToken()));
                 } else if (fastModule.isAutoRequestToken() && sasl2Feature.hasInlineFeature(org.jivesoftware.smack.fast.element.FastElements.Fast.class)) {
-                    String prefMech = fastModule.getPreferredFastMechanism();
-                    org.jivesoftware.smack.fast.element.FastElements.Fast fastFeature = sasl2Feature.getInlineFeature(org.jivesoftware.smack.fast.element.FastElements.Fast.class);
-                    if (fastFeature != null && fastFeature.getMechanisms().contains(prefMech)) {
-                        sasl2Extensions.add(new org.jivesoftware.smack.fast.element.FastElements.RequestToken(prefMech));
-                    } else if (fastFeature != null && !fastFeature.getMechanisms().isEmpty()) {
-                        sasl2Extensions.add(new org.jivesoftware.smack.fast.element.FastElements.RequestToken(fastFeature.getMechanisms().get(0)));
-                    } else {
-                        sasl2Extensions.add(new org.jivesoftware.smack.fast.element.FastElements.RequestToken(prefMech));
+                    String mechanismToRequest = selectBestAdvertisedFastMechanism(fastModule, sasl2Feature);
+                    if (mechanismToRequest != null) {
+                        sasl2Extensions.add(new org.jivesoftware.smack.fast.element.FastElements.RequestToken(mechanismToRequest));
                     }
                 }
-                sasl2Extensions.add(new org.jivesoftware.smack.sasl.packet.Sasl2Nonza.UserAgent("smack-client-instance", "Smack", null));
             }
 
             if (!useBind2) {
@@ -135,7 +147,6 @@ public class Sasl2Module extends ModularXmppClientToServerConnectionModule<Sasl2
                 sasl2Extensions
             );
 
-            Sasl2Module sasl2Module = connectionInternal.connection.getConnectionModuleFor(Sasl2ModuleDescriptor.class);
             if (sasl2Module != null) {
                 sasl2Module.sasl2AuthenticationResult = result;
             }
@@ -145,6 +156,24 @@ public class Sasl2Module extends ModularXmppClientToServerConnectionModule<Sasl2
             }
 
             return new Sasl2SuccessResult(result);
+        }
+
+        private static String selectBestAdvertisedFastMechanism(org.jivesoftware.smack.fast.FastModule fastModule, Sasl2Feature sasl2Feature) {
+            org.jivesoftware.smack.fast.element.FastElements.Fast fastFeature = sasl2Feature.getInlineFeature(org.jivesoftware.smack.fast.element.FastElements.Fast.class);
+            if (fastFeature == null || fastFeature.getMechanisms() == null || fastFeature.getMechanisms().isEmpty()) {
+                return null;
+            }
+            List<String> serverMechanisms = fastFeature.getMechanisms();
+            String prefMech = fastModule.getPreferredFastMechanism();
+            if (prefMech != null && serverMechanisms.contains(prefMech)) {
+                return prefMech;
+            }
+            for (org.jivesoftware.smack.sasl.SASLMechanism registeredMech : org.jivesoftware.smack.SASLAuthentication.getRegisteredSASLMechanisms()) {
+                if (registeredMech instanceof org.jivesoftware.smack.sasl.ht.SaslHtMechanism && serverMechanisms.contains(registeredMech.getName())) {
+                    return registeredMech.getName();
+                }
+            }
+            return serverMechanisms.get(0);
         }
 
         @Override

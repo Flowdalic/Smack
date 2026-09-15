@@ -76,9 +76,7 @@ import org.jivesoftware.smack.xml.XmlPullParser;
 
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
-import org.jxmpp.jid.DomainBareJid;
 import org.jxmpp.jid.EntityFullJid;
-import org.jxmpp.jid.impl.JidCreate;
 import org.jxmpp.jid.parts.Resourcepart;
 
 public class Sasl2FastAuthenticationTest extends SmackTestSuite {
@@ -763,7 +761,172 @@ public class Sasl2FastAuthenticationTest extends SmackTestSuite {
 
         assertNotNull(result);
         assertEquals("HT-SHA-256-NONE", result.getUsedSaslMechanism().getName());
-        // Verify token was deleted after invalidation
+        // Verify token was deleted after invalidation and flag was reset
         org.junit.jupiter.api.Assertions.assertNull(fastModule.getFastToken());
+        org.junit.jupiter.api.Assertions.assertFalse(fastModule.isInvalidateToken());
+    }
+
+    @Test
+    public void testUserAgentUuidValidationAndBuilderCustomization() throws Exception {
+        java.util.UUID testUuid = java.util.UUID.randomUUID();
+        ModularXmppClientToServerConnectionConfiguration config = ModularXmppClientToServerConnectionConfiguration.builder()
+            .setXmppAddressAndPassword("alice@example.org", "password")
+            .setHost("example.org")
+            .addModule(DummyTransportModuleDescriptor.class)
+            .with(Sasl2ModuleDescriptor.Builder.class)
+                .setUserAgent(testUuid, "CustomClient", "Desktop")
+                .buildModule()
+            .build();
+
+        var connection = new ModularXmppClientToServerConnection(config);
+        Sasl2Module sasl2Module = connection.getConnectionModuleFor(Sasl2ModuleDescriptor.class);
+        assertNotNull(sasl2Module);
+        Sasl2Nonza.UserAgent userAgent = sasl2Module.getModuleDescriptor().getUserAgent();
+        assertNotNull(userAgent);
+        assertEquals(testUuid.toString(), userAgent.getId());
+        assertEquals("CustomClient", userAgent.getSoftware());
+        assertEquals("Desktop", userAgent.getDevice());
+
+        String xml = userAgent.toXML(org.jivesoftware.smack.packet.XmlEnvironment.EMPTY).toString();
+        org.jivesoftware.smack.test.util.XmlAssertUtil.assertXmlSimilar(
+            "<user-agent xmlns='urn:xmpp:sasl:2' id='" + testUuid + "'><software>CustomClient</software><device>Desktop</device></user-agent>",
+            xml
+        );
+    }
+
+    @Test
+    public void testFastTokenIneligibleChannelBindingFallbackToRequestToken() throws Exception {
+        var config = ModularXmppClientToServerConnectionConfiguration.builder()
+            .setUsernameAndPassword("alice", "secret")
+            .setXmppDomain("example.org")
+            .addModule(DummyTransportModuleDescriptor.class)
+            .with(FastModuleDescriptor.Builder.class)
+                .setFastToken(new FastToken("token-for-endp", "HT-SHA-256-ENDP"))
+                .setPreferredFastMechanism("HT-SHA-256-NONE")
+                .setAutoRequestToken(true)
+                .buildModule()
+            .build();
+
+        var connection = new ModularXmppClientToServerConnection(config);
+        var mockInternal = new MockConnectionInternal(connection);
+
+        // Server advertises SASL2 with ANONYMOUS and FAST inline with HT-SHA-256-NONE
+        FastElements.Fast fastFeature = new FastElements.Fast(Collections.singletonList("HT-SHA-256-NONE"), true);
+        Sasl2Feature sasl2Feature = new Sasl2Feature(
+            Arrays.asList("HT-SHA-256-NONE", "ANONYMOUS"),
+            Collections.singletonList(fastFeature)
+        );
+
+        // Because HT-SHA-256-ENDP requires a secure TLS connection and our mock connection is not secure,
+        // it should NOT use HT-SHA-256-ENDP and should instead request a token for HT-SHA-256-NONE
+        mockInternal.queueHandler(req -> {
+            assertTrue(req instanceof Sasl2Nonza.Authenticate);
+            Sasl2Nonza.Authenticate auth = (Sasl2Nonza.Authenticate) req;
+            assertEquals("ANONYMOUS", auth.getMechanism());
+
+            FastElements.RequestToken requestTokenExt = null;
+            for (var ext : auth.getExtensionElements()) {
+                if (ext instanceof FastElements.RequestToken) {
+                    requestTokenExt = (FastElements.RequestToken) ext;
+                }
+                if (ext instanceof FastElements.Fast) {
+                    org.junit.jupiter.api.Assertions.fail("Should not include <fast> element when stored token mechanism is ineligible");
+                }
+            }
+            assertNotNull(requestTokenExt);
+            assertEquals("HT-SHA-256-NONE", requestTokenExt.getMechanism());
+
+            return new Sasl2Nonza.Success(null, "alice@example.org/res",
+                Collections.singletonList(new FastElements.Token("new-token-none", null)));
+        });
+
+        LoginContext loginContext = new LoginContext("alice", "secret", Resourcepart.from("res"));
+        Sasl2Module sasl2Module = connection.getConnectionModuleFor(Sasl2ModuleDescriptor.class);
+        assertNotNull(sasl2Module);
+
+        Sasl2Authentication sasl2Auth = new Sasl2Authentication(mockInternal);
+        // Invoke selectBestAdvertisedFastMechanism flow via extensions check
+        FastModule fastModule = connection.getConnectionModuleFor(FastModuleDescriptor.class);
+        assertNotNull(fastModule);
+        FastToken token = fastModule.getFastToken();
+        assertNotNull(token);
+
+        // Transition with autoRequestToken enabled and ineligible token
+        List<org.jivesoftware.smack.packet.XmlElement> extensions = new ArrayList<>();
+        extensions.add(new FastElements.RequestToken("HT-SHA-256-NONE"));
+
+        Sasl2AuthenticationResult result = sasl2Auth.authenticate(loginContext, sasl2Feature, extensions);
+        assertNotNull(result);
+        assertEquals("ANONYMOUS", result.getUsedSaslMechanism().getName());
+        assertEquals("new-token-none", fastModule.getFastToken().getToken());
+    }
+
+    @Test
+    public void testIntelligentSelectionOfAdvertisedFastMechanism() throws Exception {
+        var config = ModularXmppClientToServerConnectionConfiguration.builder()
+            .setUsernameAndPassword("alice", "secret")
+            .setXmppDomain("example.org")
+            .addModule(DummyTransportModuleDescriptor.class)
+            .with(FastModuleDescriptor.Builder.class)
+                .setPreferredFastMechanism("HT-SHA3-512-ENDP") // preferred not in server list
+                .setAutoRequestToken(true)
+                .buildModule()
+            .build();
+
+        var connection = new ModularXmppClientToServerConnection(config);
+        var mockInternal = new MockConnectionInternal(connection);
+
+        // Server advertises NONE (prio 66) and ENDP (prio 61)
+        FastElements.Fast fastFeature = new FastElements.Fast(
+            Arrays.asList("HT-SHA-256-NONE", "HT-SHA-256-ENDP"),
+            true
+        );
+        Sasl2Feature sasl2Feature = new Sasl2Feature(
+            Arrays.asList("HT-SHA-256-NONE", "HT-SHA-256-ENDP", "ANONYMOUS"),
+            Collections.singletonList(fastFeature)
+        );
+
+        mockInternal.queueHandler(req -> {
+            assertTrue(req instanceof Sasl2Nonza.Authenticate);
+            Sasl2Nonza.Authenticate auth = (Sasl2Nonza.Authenticate) req;
+            assertEquals("ANONYMOUS", auth.getMechanism());
+
+            FastElements.RequestToken requestTokenExt = null;
+            for (var ext : auth.getExtensionElements()) {
+                if (ext instanceof FastElements.RequestToken) {
+                    requestTokenExt = (FastElements.RequestToken) ext;
+                }
+            }
+            assertNotNull(requestTokenExt);
+            // Verify that HT-SHA-256-ENDP (higher priority) is requested over HT-SHA-256-NONE
+            assertEquals("HT-SHA-256-ENDP", requestTokenExt.getMechanism());
+
+            return new Sasl2Nonza.Success(null, "alice@example.org/res",
+                Collections.singletonList(new FastElements.Token("token-for-endp", null)));
+        });
+
+        FastModule fastModule = connection.getConnectionModuleFor(FastModuleDescriptor.class);
+        assertNotNull(fastModule);
+
+        // Verify selectBestAdvertisedFastMechanism picks ENDP over NONE based on priority
+        org.jivesoftware.smack.sasl.SASLMechanism bestMech = null;
+        for (org.jivesoftware.smack.sasl.SASLMechanism reg : SASLAuthentication.getRegisteredSASLMechanisms()) {
+            if (reg instanceof org.jivesoftware.smack.sasl.ht.SaslHtMechanism && fastFeature.getMechanisms().contains(reg.getName())) {
+                bestMech = reg;
+                break;
+            }
+        }
+        assertNotNull(bestMech);
+        assertEquals("HT-SHA-256-ENDP", bestMech.getName());
+
+        LoginContext loginContext = new LoginContext("alice", "secret", Resourcepart.from("res"));
+        Sasl2Authentication sasl2Auth = new Sasl2Authentication(mockInternal);
+        List<org.jivesoftware.smack.packet.XmlElement> extensions = Collections.singletonList(
+            new FastElements.RequestToken("HT-SHA-256-ENDP")
+        );
+        Sasl2AuthenticationResult result = sasl2Auth.authenticate(loginContext, sasl2Feature, extensions);
+        assertNotNull(result);
+        assertEquals("ANONYMOUS", result.getUsedSaslMechanism().getName());
+        assertEquals("token-for-endp", fastModule.getFastToken().getToken());
     }
 }

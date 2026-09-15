@@ -83,9 +83,16 @@ public class SaslHtMechanismTest {
 
     @Test
     public void testMechanismPriorities() {
-        assertEquals(55, new HtSha256ExporterMechanism().getPriority());
-        assertEquals(60, new HtSha256EndpointMechanism().getPriority());
-        assertEquals(62, new HtSha256UniqueMechanism().getPriority());
-        assertEquals(65, new HtSha256NoneMechanism().getPriority());
+        assertEquals(50, new HtSha3_512EndpointMechanism().getPriority());
+        assertEquals(55, new HtSha3_512NoneMechanism().getPriority());
+
+        assertEquals(51, new HtSha512EndpointMechanism().getPriority());
+        assertEquals(56, new HtSha512NoneMechanism().getPriority());
+
+        assertEquals(60, new HtSha3_256EndpointMechanism().getPriority());
+        assertEquals(65, new HtSha3_256NoneMechanism().getPriority());
+
+        assertEquals(61, new HtSha256EndpointMechanism().getPriority());
+        assertEquals(66, new HtSha256NoneMechanism().getPriority());
     }
 }
