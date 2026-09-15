@@ -16,24 +16,31 @@
  */
 package org.jivesoftware.smack.bind2;
 
+import java.util.List;
+
 import org.jivesoftware.smack.bind2.element.Bind2Elements;
 import org.jivesoftware.smack.c2s.ModularXmppClientToServerConnection.AuthenticatedAndResourceBoundStateDescriptor;
 import org.jivesoftware.smack.c2s.ModularXmppClientToServerConnection.AuthenticatedButUnboundStateDescriptor;
 import org.jivesoftware.smack.c2s.ModularXmppClientToServerConnectionModule;
 import org.jivesoftware.smack.c2s.internal.ModularXmppClientToServerConnectionInternal;
 import org.jivesoftware.smack.c2s.internal.WalkStateGraphContext;
+import org.jivesoftware.smack.fsm.LoginContext;
 import org.jivesoftware.smack.fsm.State;
 import org.jivesoftware.smack.fsm.StateDescriptor;
 import org.jivesoftware.smack.fsm.StateTransitionResult;
+import org.jivesoftware.smack.packet.XmlElement;
+import org.jivesoftware.smack.sasl.packet.Sasl2Feature;
 import org.jivesoftware.smack.sasl.packet.Sasl2Nonza;
 import org.jivesoftware.smack.sasl.sasl2.Sasl2Authentication.Sasl2AuthenticationResult;
+import org.jivesoftware.smack.sasl.sasl2.Sasl2AuthenticationHook;
 import org.jivesoftware.smack.sasl.sasl2.Sasl2Module;
 import org.jivesoftware.smack.sasl.sasl2.Sasl2Module.Sasl2StateDescriptor;
 import org.jivesoftware.smack.sasl.sasl2.Sasl2ModuleDescriptor;
 
 import org.jxmpp.jid.parts.Resourcepart;
 
-public class Bind2Module extends ModularXmppClientToServerConnectionModule<Bind2ModuleDescriptor> {
+public class Bind2Module extends ModularXmppClientToServerConnectionModule<Bind2ModuleDescriptor>
+                implements Sasl2AuthenticationHook {
 
     private Bind2SuccessResult bind2SuccessResult;
 
@@ -44,6 +51,19 @@ public class Bind2Module extends ModularXmppClientToServerConnectionModule<Bind2
 
     public Bind2SuccessResult getBind2SuccessResult() {
         return bind2SuccessResult;
+    }
+
+    @Override
+    public void addAuthenticateExtensions(Sasl2Feature sasl2Feature, LoginContext loginContext, List<XmlElement> extensions) {
+        if (!sasl2Feature.hasInlineFeature(Bind2Elements.Bind.class)) {
+            return;
+        }
+
+        String tag = null;
+        if (loginContext.resource != null) {
+             tag = loginContext.resource.toString();
+        }
+        extensions.add(new Bind2Elements.Bind(tag, null));
     }
 
     public static final class Bind2StateDescriptor extends StateDescriptor {

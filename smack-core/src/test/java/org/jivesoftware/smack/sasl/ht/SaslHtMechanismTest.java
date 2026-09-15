@@ -27,7 +27,6 @@ import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
 
 import org.jivesoftware.smack.SmackException.SmackSaslException;
-import org.jivesoftware.smack.fast.FastToken;
 import org.jivesoftware.smack.util.ByteUtils;
 
 import org.junit.jupiter.api.Test;
@@ -38,8 +37,7 @@ public class SaslHtMechanismTest {
     @Test
     public void testSha256NoneAuthenticationText() throws Exception {
         HtSha256NoneMechanism mechanism = new HtSha256NoneMechanism();
-        FastToken token = new FastToken("supersecrettoken", HtSha256NoneMechanism.NAME);
-        mechanism.setFastToken(token);
+        mechanism.setToken("supersecrettoken");
 
         byte[] authText = mechanism.getInitialResponse("alice", "example.org", JidCreate.domainBareFrom("example.org"), null, null, null);
 
@@ -55,8 +53,7 @@ public class SaslHtMechanismTest {
     @Test
     public void testSha256NoneEvaluateChallengeSuccess() throws Exception {
         HtSha256NoneMechanism mechanism = new HtSha256NoneMechanism();
-        FastToken token = new FastToken("supersecrettoken", HtSha256NoneMechanism.NAME);
-        mechanism.setFastToken(token);
+        mechanism.setToken("supersecrettoken");
 
         mechanism.getInitialResponse("alice", "example.org", JidCreate.domainBareFrom("example.org"), null, null, null);
 
@@ -71,8 +68,7 @@ public class SaslHtMechanismTest {
     @Test
     public void testSha256NoneEvaluateChallengeFailure() throws Exception {
         HtSha256NoneMechanism mechanism = new HtSha256NoneMechanism();
-        FastToken token = new FastToken("supersecrettoken", HtSha256NoneMechanism.NAME);
-        mechanism.setFastToken(token);
+        mechanism.setToken("supersecrettoken");
 
         mechanism.getInitialResponse("alice", "example.org", JidCreate.domainBareFrom("example.org"), null, null, null);
 

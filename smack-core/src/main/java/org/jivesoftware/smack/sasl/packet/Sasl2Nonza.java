@@ -298,11 +298,27 @@ public interface Sasl2Nonza extends Nonza {
             return getExtension(extensionElementClass) != null;
         }
 
+        public boolean hasExtension(String elementName, String namespace) {
+            return hasExtension(new QName(namespace, elementName));
+        }
+
         public boolean hasExtension(QName qname) {
             return getExtension(qname) != null;
         }
 
+        public XmlElement getExtension(String elementName, String namespace) {
+            return getExtension(new QName(namespace, elementName));
+        }
+
         public <E extends ExtensionElement> E getExtension(Class<E> extensionElementClass) {
+            if (extensionElementClass.isInterface()) {
+                for (XmlElement element : extensionElements) {
+                    if (extensionElementClass.isInstance(element)) {
+                        return extensionElementClass.cast(element);
+                    }
+                }
+                return null;
+            }
             return XmppElementUtil.from(extensionElements, extensionElementClass);
         }
 
@@ -316,6 +332,15 @@ public interface Sasl2Nonza extends Nonza {
         }
 
         public <E extends ExtensionElement> List<E> getExtensions(Class<E> extensionElementClass) {
+            if (extensionElementClass.isInterface()) {
+                List<E> res = new ArrayList<>();
+                for (XmlElement element : extensionElements) {
+                    if (extensionElementClass.isInstance(element)) {
+                        res.add(extensionElementClass.cast(element));
+                    }
+                }
+                return res;
+            }
             return XmppElementUtil.getElementsFrom(extensionElements, extensionElementClass);
         }
 

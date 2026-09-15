@@ -27,6 +27,7 @@ import javax.xml.namespace.QName;
 
 import org.jivesoftware.smack.packet.ExtensionElement;
 import org.jivesoftware.smack.packet.XmlEnvironment;
+import org.jivesoftware.smack.sasl.packet.Sasl2MechanismsInlineFeature;
 import org.jivesoftware.smack.util.XmlStringBuilder;
 
 public class FastElements {
@@ -37,7 +38,7 @@ public class FastElements {
      * Represents the &lt;fast/&gt; element in XEP-0484.
      * Can be used as a SASL2 inline feature advertisement or inside &lt;authenticate/&gt;.
      */
-    public static class Fast implements ExtensionElement {
+    public static class Fast implements ExtensionElement, Sasl2MechanismsInlineFeature {
         public static final String ELEMENT = "fast";
         public static final QName QNAME = new QName(NAMESPACE, ELEMENT);
 
@@ -71,6 +72,7 @@ public class FastElements {
             return NAMESPACE;
         }
 
+        @Override
         public List<String> getMechanisms() {
             return mechanisms;
         }

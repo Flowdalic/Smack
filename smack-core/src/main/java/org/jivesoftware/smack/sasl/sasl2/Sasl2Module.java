@@ -17,13 +17,14 @@
 package org.jivesoftware.smack.sasl.sasl2;
 
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
+import java.util.Set;
+import java.util.concurrent.CopyOnWriteArraySet;
 
 import org.jivesoftware.smack.SmackException;
 import org.jivesoftware.smack.XMPPException;
-import org.jivesoftware.smack.bind2.Bind2Module;
-import org.jivesoftware.smack.bind2.Bind2ModuleDescriptor;
-import org.jivesoftware.smack.bind2.element.Bind2Elements;
 import org.jivesoftware.smack.c2s.ModularXmppClientToServerConnection.AuthenticatedButUnboundStateDescriptor;
 import org.jivesoftware.smack.c2s.ModularXmppClientToServerConnection.ConnectedButUnauthenticatedStateDescriptor;
 import org.jivesoftware.smack.c2s.ModularXmppClientToServerConnection.SaslAuthenticationStateDescriptor;
@@ -34,12 +35,14 @@ import org.jivesoftware.smack.fsm.LoginContext;
 import org.jivesoftware.smack.fsm.State;
 import org.jivesoftware.smack.fsm.StateDescriptor;
 import org.jivesoftware.smack.fsm.StateTransitionResult;
+import org.jivesoftware.smack.packet.XmlElement;
 import org.jivesoftware.smack.sasl.packet.Sasl2Feature;
 import org.jivesoftware.smack.sasl.packet.Sasl2Nonza;
 import org.jivesoftware.smack.sasl.sasl2.Sasl2Authentication.Sasl2AuthenticationResult;
 
 public class Sasl2Module extends ModularXmppClientToServerConnectionModule<Sasl2ModuleDescriptor> {
 
+    private final Set<Sasl2AuthenticationHook> customHooks = new CopyOnWriteArraySet<>();
     private Sasl2AuthenticationResult sasl2AuthenticationResult;
 
     protected Sasl2Module(Sasl2ModuleDescriptor moduleDescriptor,
@@ -49,6 +52,24 @@ public class Sasl2Module extends ModularXmppClientToServerConnectionModule<Sasl2
 
     public Sasl2AuthenticationResult getSasl2AuthenticationResult() {
         return sasl2AuthenticationResult;
+    }
+
+    public void addSasl2AuthenticationHook(Sasl2AuthenticationHook hook) {
+        customHooks.add(hook);
+    }
+
+    public boolean removeSasl2AuthenticationHook(Sasl2AuthenticationHook hook) {
+        return customHooks.remove(hook);
+    }
+
+    public List<Sasl2AuthenticationHook> getHooks() {
+        List<Sasl2AuthenticationHook> allHooks = new ArrayList<>();
+        if (connectionInternal.connection != null) {
+            allHooks.addAll(connectionInternal.connection
+                            .getConnectionModulesImplementing(Sasl2AuthenticationHook.class));
+        }
+        allHooks.addAll(customHooks);
+        return Collections.unmodifiableList(allHooks);
     }
 
     public static final class Sasl2StateDescriptor extends StateDescriptor {
@@ -90,90 +111,35 @@ public class Sasl2Module extends ModularXmppClientToServerConnectionModule<Sasl2
         @Override
         public StateTransitionResult.AttemptResult transitionInto(WalkStateGraphContext walkStateGraphContext)
                         throws SmackException, XMPPException, IOException, InterruptedException {
-            List<org.jivesoftware.smack.packet.XmlElement> sasl2Extensions = new java.util.ArrayList<>();
-
-            Bind2Module bind2Module = connectionInternal.connection.getConnectionModuleFor(Bind2ModuleDescriptor.class);
-            boolean useBind2 = bind2Module != null && sasl2Feature.hasInlineFeature(Bind2Elements.Bind.class);
-
-            LoginContext loginContext = walkStateGraphContext.getLoginContext();
-            if (useBind2) {
-                String tag = null;
-                if (loginContext.resource != null) {
-                    tag = loginContext.resource.toString();
-                }
-                sasl2Extensions.add(new Bind2Elements.Bind(tag, null));
-            }
+            List<XmlElement> sasl2Extensions = new ArrayList<>();
 
             Sasl2Module sasl2Module = connectionInternal.connection.getConnectionModuleFor(Sasl2ModuleDescriptor.class);
-            Sasl2Nonza.UserAgent userAgent = (sasl2Module != null && sasl2Module.getModuleDescriptor() != null)
-                            ? sasl2Module.getModuleDescriptor().getUserAgent()
-                            : new Sasl2Nonza.UserAgent(Sasl2Nonza.UserAgent.DEFAULT_SOFTWARE, null);
+            Sasl2Nonza.UserAgent userAgent = sasl2Module.getModuleDescriptor().getUserAgent();
             sasl2Extensions.add(userAgent);
 
-            org.jivesoftware.smack.fast.FastModule fastModule = connectionInternal.connection.getConnectionModuleFor(
-                org.jivesoftware.smack.fast.FastModuleDescriptor.class);
-            if (fastModule != null && fastModule.isEnabled()) {
-                org.jivesoftware.smack.fast.FastToken token = fastModule.getFastToken();
-                boolean isTokenUsable = false;
-                if (token != null && !token.isExpired() && sasl2Feature.isMechanismAvailable(token.getMechanism())) {
-                    org.jivesoftware.smack.sasl.SASLMechanism mech = org.jivesoftware.smack.SASLAuthentication.getRegisteredSASLMechanism(token.getMechanism());
-                    if (mech != null) {
-                        String skipReason = fastModule.getSkipReason(mech, connectionInternal.connection.getConfiguration());
-                        if (skipReason == null) {
-                            isTokenUsable = true;
-                        }
-                    }
-                }
+            List<Sasl2AuthenticationHook> hooks = sasl2Module.getHooks();
+            LoginContext loginContext = walkStateGraphContext.getLoginContext();
 
-                if (isTokenUsable) {
-                    long count = fastModule.incrementTokenCount();
-                    sasl2Extensions.add(new org.jivesoftware.smack.fast.element.FastElements.Fast(count > 0 ? count : null, fastModule.isInvalidateToken()));
-                } else if (fastModule.isAutoRequestToken() && sasl2Feature.hasInlineFeature(org.jivesoftware.smack.fast.element.FastElements.Fast.class)) {
-                    String mechanismToRequest = selectBestAdvertisedFastMechanism(fastModule, sasl2Feature);
-                    if (mechanismToRequest != null) {
-                        sasl2Extensions.add(new org.jivesoftware.smack.fast.element.FastElements.RequestToken(mechanismToRequest));
-                    }
-                }
+            for (Sasl2AuthenticationHook hook : hooks) {
+                hook.addAuthenticateExtensions(sasl2Feature, loginContext, sasl2Extensions);
             }
 
-            if (!useBind2) {
-                connectionInternal.prepareToWaitForFeaturesReceived();
-            }
+            connectionInternal.prepareToWaitForFeaturesReceived();
 
-            Sasl2Authentication sasl2Authentication = new Sasl2Authentication(connectionInternal);
+            Sasl2Authentication sasl2Authentication = new Sasl2Authentication(connectionInternal, hooks);
             Sasl2AuthenticationResult result = sasl2Authentication.authenticate(
                 loginContext,
                 sasl2Feature,
                 sasl2Extensions
             );
 
-            if (sasl2Module != null) {
-                sasl2Module.sasl2AuthenticationResult = result;
-            }
+            sasl2Module.sasl2AuthenticationResult = result;
 
-            if (!useBind2 && !result.isResourceBound() && !result.isStreamResumed()) {
+            if (!result.isResourceBound() && !result.isStreamResumed()) {
                 connectionInternal.waitForFeaturesReceived("server stream features after SASL2 authentication");
             }
 
             return new Sasl2SuccessResult(result);
-        }
-
-        private static String selectBestAdvertisedFastMechanism(org.jivesoftware.smack.fast.FastModule fastModule, Sasl2Feature sasl2Feature) {
-            org.jivesoftware.smack.fast.element.FastElements.Fast fastFeature = sasl2Feature.getInlineFeature(org.jivesoftware.smack.fast.element.FastElements.Fast.class);
-            if (fastFeature == null || fastFeature.getMechanisms() == null || fastFeature.getMechanisms().isEmpty()) {
-                return null;
-            }
-            List<String> serverMechanisms = fastFeature.getMechanisms();
-            String prefMech = fastModule.getPreferredFastMechanism();
-            if (prefMech != null && serverMechanisms.contains(prefMech)) {
-                return prefMech;
-            }
-            for (org.jivesoftware.smack.sasl.SASLMechanism registeredMech : org.jivesoftware.smack.SASLAuthentication.getRegisteredSASLMechanisms()) {
-                if (registeredMech instanceof org.jivesoftware.smack.sasl.ht.SaslHtMechanism && serverMechanisms.contains(registeredMech.getName())) {
-                    return registeredMech.getName();
-                }
-            }
-            return serverMechanisms.get(0);
         }
 
         @Override

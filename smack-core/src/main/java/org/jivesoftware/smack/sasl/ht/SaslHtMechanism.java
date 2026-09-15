@@ -26,17 +26,15 @@ import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
 import javax.security.auth.callback.CallbackHandler;
 
+import org.jivesoftware.smack.ConnectionConfiguration;
 import org.jivesoftware.smack.SmackException.SmackSaslException;
 import org.jivesoftware.smack.XMPPConnection;
-import org.jivesoftware.smack.c2s.ModularXmppClientToServerConnection;
-import org.jivesoftware.smack.fast.FastModule;
-import org.jivesoftware.smack.fast.FastModuleDescriptor;
-import org.jivesoftware.smack.fast.FastToken;
 import org.jivesoftware.smack.sasl.SASLMechanism;
+import org.jivesoftware.smack.sasl.SaslTokenMechanism;
 import org.jivesoftware.smack.util.ByteUtils;
 import org.jivesoftware.smack.util.TLSUtils;
 
-public abstract class SaslHtMechanism extends SASLMechanism {
+public abstract class SaslHtMechanism extends SASLMechanism implements SaslTokenMechanism {
 
     public enum HashAlgorithm {
         SHA_256("SHA-256", "HmacSHA256"),
@@ -90,7 +88,7 @@ public abstract class SaslHtMechanism extends SASLMechanism {
     private final int priority;
 
     private State state = State.INITIAL;
-    private FastToken fastToken;
+    private String token;
 
     protected SaslHtMechanism(HashAlgorithm hashAlgorithm, ChannelBindingType channelBindingType, int priority) {
         this.hashAlgorithm = Objects.requireNonNull(hashAlgorithm, "hashAlgorithm must not be null");
@@ -126,12 +124,14 @@ public abstract class SaslHtMechanism extends SASLMechanism {
         return channelBindingType;
     }
 
-    public void setFastToken(FastToken fastToken) {
-        this.fastToken = fastToken;
+    @Override
+    public void setToken(String token) {
+        this.token = token;
     }
 
-    public FastToken getFastToken() {
-        return fastToken;
+    @Override
+    public String getToken() {
+        return token;
     }
 
     public String getChannelBindingNotSupportedReason(XMPPConnection connection) {
@@ -153,28 +153,28 @@ public abstract class SaslHtMechanism extends SASLMechanism {
     }
 
     @Override
+    public SASLMechanism instanceForAuthentication(XMPPConnection connection, ConnectionConfiguration connectionConfiguration) {
+        SaslHtMechanism htMechanism = (SaslHtMechanism) super.instanceForAuthentication(connection, connectionConfiguration);
+        htMechanism.token = this.token;
+        return htMechanism;
+    }
+
+    @Override
     protected void authenticateInternal(CallbackHandler cbh) {
         throw new UnsupportedOperationException("CallbackHandler is not supported for SASL-HT");
     }
 
     @Override
     protected byte[] getAuthenticationText() throws SmackSaslException {
-        FastToken tokenToUse = fastToken;
-        if (tokenToUse == null && connection instanceof ModularXmppClientToServerConnection) {
-            ModularXmppClientToServerConnection modularConnection = (ModularXmppClientToServerConnection) connection;
-            FastModule fastModule = modularConnection.getConnectionModuleFor(FastModuleDescriptor.class);
-            if (fastModule != null) {
-                tokenToUse = fastModule.getFastToken();
-            }
-        }
+        String tokenToUse = this.token != null ? this.token : this.password;
 
         if (tokenToUse == null) {
-            throw new SmackSaslException("No FAST token available for SASL-HT mechanism " + getName());
+            throw new SmackSaslException("No token available for SASL-HT mechanism " + getName());
         }
-        this.fastToken = tokenToUse;
+        this.token = tokenToUse;
 
         byte[] cbData = getChannelBindingData();
-        byte[] tokenBytes = tokenToUse.getToken().getBytes(StandardCharsets.UTF_8);
+        byte[] tokenBytes = tokenToUse.getBytes(StandardCharsets.UTF_8);
         byte[] initiatorData = ByteUtils.concat(INITIATOR_PREFIX, cbData);
         byte[] initiatorHashedToken = computeHmac(tokenBytes, initiatorData);
 
@@ -188,11 +188,11 @@ public abstract class SaslHtMechanism extends SASLMechanism {
 
     @Override
     protected byte[] evaluateChallenge(byte[] challenge) throws SmackSaslException {
-        if (fastToken == null) {
-            throw new SmackSaslException("Fast token is missing during server challenge verification");
+        if (token == null) {
+            throw new SmackSaslException("Token is missing during server challenge verification");
         }
         byte[] cbData = getChannelBindingData();
-        byte[] tokenBytes = fastToken.getToken().getBytes(StandardCharsets.UTF_8);
+        byte[] tokenBytes = token.getBytes(StandardCharsets.UTF_8);
         byte[] responderData = ByteUtils.concat(RESPONDER_PREFIX, cbData);
         byte[] expectedResponderMsg = computeHmac(tokenBytes, responderData);
 

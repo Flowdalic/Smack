@@ -17,6 +17,7 @@
 package org.jivesoftware.smack.sasl.packet;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 
@@ -60,13 +61,17 @@ public class Sasl2Feature implements ExtensionElement {
     }
 
     public List<String> getAllAvailableMechanisms() {
-        var fast = getInlineFeature(org.jivesoftware.smack.fast.element.FastElements.Fast.class);
-        if (fast == null || fast.getMechanisms() == null || fast.getMechanisms().isEmpty()) {
+        List<Sasl2MechanismsInlineFeature> inlineMechanismsFeatures = getInlineFeatures(Sasl2MechanismsInlineFeature.class);
+        if (inlineMechanismsFeatures.isEmpty()) {
             return mechanisms;
         }
-        java.util.Set<String> all = new java.util.LinkedHashSet<>(mechanisms.size() + fast.getMechanisms().size());
-        all.addAll(mechanisms);
-        all.addAll(fast.getMechanisms());
+        java.util.Set<String> all = new java.util.LinkedHashSet<>(mechanisms);
+        for (Sasl2MechanismsInlineFeature feature : inlineMechanismsFeatures) {
+            Collection<String> mechs = feature.getMechanisms();
+            if (mechs != null) {
+                all.addAll(mechs);
+            }
+        }
         return new ArrayList<>(all);
     }
 
@@ -74,9 +79,11 @@ public class Sasl2Feature implements ExtensionElement {
         if (mechanisms.contains(mechanism)) {
             return true;
         }
-        var fast = getInlineFeature(org.jivesoftware.smack.fast.element.FastElements.Fast.class);
-        if (fast != null && fast.getMechanisms() != null && fast.getMechanisms().contains(mechanism)) {
-            return true;
+        for (Sasl2MechanismsInlineFeature feature : getInlineFeatures(Sasl2MechanismsInlineFeature.class)) {
+            Collection<String> mechs = feature.getMechanisms();
+            if (mechs != null && mechs.contains(mechanism)) {
+                return true;
+            }
         }
         return false;
     }
@@ -176,6 +183,14 @@ public class Sasl2Feature implements ExtensionElement {
         }
 
         public <E extends ExtensionElement> E getFeature(Class<E> featureClass) {
+            if (featureClass.isInterface()) {
+                for (XmlElement feature : features) {
+                    if (featureClass.isInstance(feature)) {
+                        return featureClass.cast(feature);
+                    }
+                }
+                return null;
+            }
             return XmppElementUtil.from(features, featureClass);
         }
 
@@ -193,6 +208,15 @@ public class Sasl2Feature implements ExtensionElement {
         }
 
         public <E extends ExtensionElement> List<E> getFeatures(Class<E> featureClass) {
+            if (featureClass.isInterface()) {
+                List<E> res = new ArrayList<>();
+                for (XmlElement feature : features) {
+                    if (featureClass.isInstance(feature)) {
+                        res.add(featureClass.cast(feature));
+                    }
+                }
+                return res;
+            }
             return XmppElementUtil.getElementsFrom(features, featureClass);
         }
 
