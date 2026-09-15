@@ -16,11 +16,7 @@
  */
 package org.jivesoftware.smack.bind2;
 
-import java.util.List;
-
 import org.jivesoftware.smack.bind2.element.Bind2Elements;
-import org.jivesoftware.smack.c2s.ModularXmppClientToServerConnection.AuthenticatedAndResourceBoundStateDescriptor;
-import org.jivesoftware.smack.c2s.ModularXmppClientToServerConnection.AuthenticatedButUnboundStateDescriptor;
 import org.jivesoftware.smack.c2s.ModularXmppClientToServerConnectionModule;
 import org.jivesoftware.smack.c2s.internal.ModularXmppClientToServerConnectionInternal;
 import org.jivesoftware.smack.c2s.internal.WalkStateGraphContext;
@@ -28,19 +24,16 @@ import org.jivesoftware.smack.fsm.LoginContext;
 import org.jivesoftware.smack.fsm.State;
 import org.jivesoftware.smack.fsm.StateDescriptor;
 import org.jivesoftware.smack.fsm.StateTransitionResult;
-import org.jivesoftware.smack.packet.XmlElement;
 import org.jivesoftware.smack.sasl.packet.Sasl2Feature;
 import org.jivesoftware.smack.sasl.packet.Sasl2Nonza;
-import org.jivesoftware.smack.sasl.sasl2.Sasl2Authentication.Sasl2AuthenticationResult;
-import org.jivesoftware.smack.sasl.sasl2.Sasl2AuthenticationHook;
 import org.jivesoftware.smack.sasl.sasl2.Sasl2Module;
-import org.jivesoftware.smack.sasl.sasl2.Sasl2Module.Sasl2StateDescriptor;
+import org.jivesoftware.smack.sasl.sasl2.Sasl2Module.Sasl2AuthStateDescriptor;
+import org.jivesoftware.smack.sasl.sasl2.Sasl2Module.Sasl2InitStateDescriptor;
 import org.jivesoftware.smack.sasl.sasl2.Sasl2ModuleDescriptor;
 
 import org.jxmpp.jid.parts.Resourcepart;
 
-public class Bind2Module extends ModularXmppClientToServerConnectionModule<Bind2ModuleDescriptor>
-                implements Sasl2AuthenticationHook {
+public class Bind2Module extends ModularXmppClientToServerConnectionModule<Bind2ModuleDescriptor> {
 
     private Bind2SuccessResult bind2SuccessResult;
 
@@ -53,31 +46,17 @@ public class Bind2Module extends ModularXmppClientToServerConnectionModule<Bind2
         return bind2SuccessResult;
     }
 
-    @Override
-    public void addAuthenticateExtensions(Sasl2Feature sasl2Feature, LoginContext loginContext, List<XmlElement> extensions) {
-        if (!sasl2Feature.hasInlineFeature(Bind2Elements.Bind.class)) {
-            return;
-        }
-
-        String tag = null;
-        if (loginContext.resource != null) {
-             tag = loginContext.resource.toString();
-        }
-        extensions.add(new Bind2Elements.Bind(tag, null));
-    }
-
     public static final class Bind2StateDescriptor extends StateDescriptor {
         private Bind2StateDescriptor() {
             super(Bind2State.class, 386);
 
-            addPredeccessor(Sasl2StateDescriptor.class);
-            addSuccessor(AuthenticatedAndResourceBoundStateDescriptor.class);
-            declarePrecedenceOver(AuthenticatedButUnboundStateDescriptor.class);
+            addPredeccessor(Sasl2InitStateDescriptor.class);
+            addSuccessor(Sasl2AuthStateDescriptor.class);
+            declarePrecedenceOver(Sasl2AuthStateDescriptor.class);
         }
 
         @Override
         protected Bind2Module.Bind2State constructState(ModularXmppClientToServerConnectionInternal connectionInternal) {
-            // This is the trick: the module is constructed prior the states, so we get the actual state out of the module by fetching the module from the connection.
             Bind2Module bind2Module = connectionInternal.connection.getConnectionModuleFor(Bind2ModuleDescriptor.class);
             return bind2Module.constructBind2State(this, connectionInternal);
         }
@@ -92,18 +71,9 @@ public class Bind2Module extends ModularXmppClientToServerConnectionModule<Bind2
 
         @Override
         public StateTransitionResult.TransitionImpossible isTransitionToPossible(WalkStateGraphContext walkStateGraphContext) {
-            Sasl2Module sasl2Module = connectionInternal.connection.getConnectionModuleFor(Sasl2ModuleDescriptor.class);
-            if (sasl2Module == null) {
-                return new StateTransitionResult.TransitionImpossibleReason("SASL 2 module not found on connection");
-            }
-
-            Sasl2AuthenticationResult result = sasl2Module.getSasl2AuthenticationResult();
-            if (result == null) {
-                return new StateTransitionResult.TransitionImpossibleReason("SASL 2 authentication has not yielded a result");
-            }
-
-            if (!result.isResourceBound()) {
-                return new StateTransitionResult.TransitionImpossibleReason("Bind 2 was not performed during SASL 2 authentication");
+            Sasl2Feature sasl2Feature = connectionInternal.connection.getFeature(Sasl2Feature.class);
+            if (sasl2Feature == null || !sasl2Feature.hasInlineFeature(Bind2Elements.Bind.class)) {
+                return new StateTransitionResult.TransitionImpossibleReason("Bind 2 inline feature not announced");
             }
 
             return null;
@@ -116,24 +86,29 @@ public class Bind2Module extends ModularXmppClientToServerConnectionModule<Bind2
                 return new StateTransitionResult.Failure("SASL 2 module not found on connection");
             }
 
-            Sasl2AuthenticationResult result = sasl2Module.getSasl2AuthenticationResult();
-            if (result == null || !result.isResourceBound()) {
-                return new StateTransitionResult.Failure("Bind 2 was not performed during SASL 2 authentication");
+            LoginContext loginContext = walkStateGraphContext.getLoginContext();
+            String tag = null;
+            if (loginContext.resource != null) {
+                tag = loginContext.resource.toString();
             }
-
-            Bind2SuccessResult successResult = new Bind2SuccessResult(
-                result.getBoundResource(),
-                walkStateGraphContext.getLoginContext().resource,
-                result.getSuccessExtension(Bind2Elements.Bound.class),
-                result.getSuccessNonza()
-            );
+            sasl2Module.getAuthenticationContext().addExtension(new Bind2Elements.Bind(tag, null));
 
             Bind2Module bind2Module = connectionInternal.connection.getConnectionModuleFor(Bind2ModuleDescriptor.class);
-            if (bind2Module != null) {
-                bind2Module.bind2SuccessResult = successResult;
-            }
+            sasl2Module.getAuthenticationContext().addSuccessCallback(result -> {
+                if (result.isResourceBound()) {
+                    Bind2SuccessResult successResult = new Bind2SuccessResult(
+                        result.getBoundResource(),
+                        loginContext.resource,
+                        result.getSuccessExtension(Bind2Elements.Bound.class),
+                        result.getSuccessNonza()
+                    );
+                    if (bind2Module != null) {
+                        bind2Module.bind2SuccessResult = successResult;
+                    }
+                }
+            });
 
-            return successResult;
+            return new StateTransitionResult.Success("Bind 2 configured for SASL2 authentication");
         }
 
         @Override

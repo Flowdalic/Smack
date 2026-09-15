@@ -26,10 +26,15 @@ import java.util.function.Function;
 import org.jivesoftware.smack.ConnectionConfiguration;
 import org.jivesoftware.smack.SASLAuthentication;
 import org.jivesoftware.smack.SmackException;
+import org.jivesoftware.smack.bind2.Bind2Module.Bind2StateDescriptor;
 import org.jivesoftware.smack.c2s.ModularXmppClientToServerConnectionModule;
 import org.jivesoftware.smack.c2s.internal.ModularXmppClientToServerConnectionInternal;
+import org.jivesoftware.smack.c2s.internal.WalkStateGraphContext;
 import org.jivesoftware.smack.fast.element.FastElements;
 import org.jivesoftware.smack.fsm.LoginContext;
+import org.jivesoftware.smack.fsm.State;
+import org.jivesoftware.smack.fsm.StateDescriptor;
+import org.jivesoftware.smack.fsm.StateTransitionResult;
 import org.jivesoftware.smack.packet.XmlElement;
 import org.jivesoftware.smack.sasl.SASLErrorException;
 import org.jivesoftware.smack.sasl.SASLMechanism;
@@ -38,10 +43,14 @@ import org.jivesoftware.smack.sasl.ht.SaslHtMechanism;
 import org.jivesoftware.smack.sasl.packet.Sasl2Feature;
 import org.jivesoftware.smack.sasl.sasl2.Sasl2Authentication.Sasl2AuthenticationResult;
 import org.jivesoftware.smack.sasl.sasl2.Sasl2AuthenticationHook;
+import org.jivesoftware.smack.sasl.sasl2.Sasl2AuthenticationHookSupplier;
 import org.jivesoftware.smack.sasl.sasl2.Sasl2Fallback;
+import org.jivesoftware.smack.sasl.sasl2.Sasl2Module;
+import org.jivesoftware.smack.sasl.sasl2.Sasl2Module.Sasl2AuthStateDescriptor;
+import org.jivesoftware.smack.sasl.sasl2.Sasl2ModuleDescriptor;
 
 public class FastModule extends ModularXmppClientToServerConnectionModule<FastModuleDescriptor>
-                implements Sasl2AuthenticationHook {
+                implements Sasl2AuthenticationHookSupplier {
 
     private final String preferredFastMechanism;
     private final boolean autoRequestToken;
@@ -50,6 +59,7 @@ public class FastModule extends ModularXmppClientToServerConnectionModule<FastMo
 
     private FastToken fastToken;
     private boolean invalidateToken;
+    private final Sasl2AuthenticationHook authenticationHook = new FastAuthenticationHook();
 
     protected FastModule(FastModuleDescriptor moduleDescriptor,
                     ModularXmppClientToServerConnectionInternal connectionInternal) {
@@ -138,12 +148,23 @@ public class FastModule extends ModularXmppClientToServerConnectionModule<FastMo
         return fastTokenListeners.remove(listener);
     }
 
-    public String getSkipReason(SASLMechanism mechanism, ConnectionConfiguration configuration) {
-        return getSkipReason(mechanism, null, configuration);
+    @Override
+    public Sasl2AuthenticationHook getSasl2AuthenticationHook() {
+        return authenticationHook;
     }
 
-    @Override
-    public String getSkipReason(SASLMechanism mechanism, Sasl2Feature sasl2Feature, ConnectionConfiguration configuration) {
+    boolean hasUsableToken(Sasl2Feature sasl2Feature) {
+        if (fastToken == null || fastToken.isExpired() || !sasl2Feature.isMechanismAvailable(fastToken.getMechanism())) {
+            return false;
+        }
+        SASLMechanism mech = SASLAuthentication.getRegisteredSASLMechanism(fastToken.getMechanism());
+        if (mech == null) {
+            return false;
+        }
+        return getSkipReasonInternal(mech) == null;
+    }
+
+    private String getSkipReasonInternal(SASLMechanism mechanism) {
         if (!(mechanism instanceof SaslHtMechanism)) {
             return null;
         }
@@ -171,8 +192,7 @@ public class FastModule extends ModularXmppClientToServerConnectionModule<FastMo
         return htMechanism.getChannelBindingNotSupportedReason(connectionInternal.connection);
     }
 
-    @Override
-    public void prepareSelectedMechanism(SASLMechanism mechanism, Sasl2Feature sasl2Feature) throws SmackException {
+    private void prepareSelectedMechanismInternal(SASLMechanism mechanism) {
         if (!enabled) {
             return;
         }
@@ -184,23 +204,12 @@ public class FastModule extends ModularXmppClientToServerConnectionModule<FastMo
         }
     }
 
-    @Override
-    public void addAuthenticateExtensions(Sasl2Feature sasl2Feature, LoginContext loginContext, List<XmlElement> extensions)
-                    throws SmackException {
+    private void addAuthenticateExtensionsInternal(Sasl2Feature sasl2Feature, List<XmlElement> extensions) {
         if (!enabled) {
             return;
         }
 
-        boolean isTokenUsable = false;
-        if (fastToken != null && !fastToken.isExpired() && sasl2Feature.isMechanismAvailable(fastToken.getMechanism())) {
-            SASLMechanism mech = SASLAuthentication.getRegisteredSASLMechanism(fastToken.getMechanism());
-            if (mech != null) {
-                String skipReason = getSkipReason(mech, sasl2Feature, connectionInternal.connection.getConfiguration());
-                if (skipReason == null) {
-                    isTokenUsable = true;
-                }
-            }
-        }
+        boolean isTokenUsable = hasUsableToken(sasl2Feature);
 
         if (isTokenUsable) {
             long count = incrementTokenCount();
@@ -230,9 +239,7 @@ public class FastModule extends ModularXmppClientToServerConnectionModule<FastMo
         return serverMechanisms.get(0);
     }
 
-    @Override
-    public void onSasl2Success(Sasl2AuthenticationResult result, Collection<? extends XmlElement> authenticateExtensions)
-                    throws SmackException {
+    private void onSasl2SuccessInternal(Sasl2AuthenticationResult result, Collection<? extends XmlElement> authenticateExtensions) {
         if (!enabled) {
             return;
         }
@@ -269,9 +276,8 @@ public class FastModule extends ModularXmppClientToServerConnectionModule<FastMo
         }
     }
 
-    @Override
-    public Sasl2Fallback onSasl2Failure(SASLErrorException failure, SASLMechanism failedMechanism,
-                                         Sasl2Feature sasl2Feature, Collection<? extends XmlElement> attemptedExtensions) {
+    private Sasl2Fallback onSasl2FailureInternal(SASLMechanism failedMechanism,
+                                                 Sasl2Feature sasl2Feature, Collection<? extends XmlElement> attemptedExtensions) {
         if (!enabled) {
             return null;
         }
@@ -305,4 +311,107 @@ public class FastModule extends ModularXmppClientToServerConnectionModule<FastMo
 
         return null;
     }
+
+    private final class FastAuthenticationHook implements Sasl2AuthenticationHook {
+        @Override
+        public String getSkipReason(SASLMechanism mechanism, Sasl2Feature sasl2Feature, ConnectionConfiguration configuration) {
+            if (hasUsableToken(sasl2Feature)) {
+                if (!mechanism.getName().equals(fastToken.getMechanism())) {
+                    return "FAST token is present for " + fastToken.getMechanism() + "; skipping " + mechanism.getName();
+                }
+            }
+            return getSkipReasonInternal(mechanism);
+        }
+
+        @Override
+        public void prepareSelectedMechanism(SASLMechanism mechanism, Sasl2Feature sasl2Feature) throws SmackException {
+            prepareSelectedMechanismInternal(mechanism);
+        }
+
+        @Override
+        public void addAuthenticateExtensions(Sasl2Feature sasl2Feature, LoginContext loginContext, List<XmlElement> extensions)
+                        throws SmackException {
+            addAuthenticateExtensionsInternal(sasl2Feature, extensions);
+        }
+
+        @Override
+        public void onSasl2Success(Sasl2AuthenticationResult result, Collection<? extends XmlElement> authenticateExtensions)
+                        throws SmackException {
+            onSasl2SuccessInternal(result, authenticateExtensions);
+        }
+
+        @Override
+        public Sasl2Fallback onSasl2Failure(SASLErrorException failure, SASLMechanism failedMechanism,
+                                             Sasl2Feature sasl2Feature, Collection<? extends XmlElement> attemptedExtensions) {
+            return onSasl2FailureInternal(failedMechanism, sasl2Feature, attemptedExtensions);
+        }
+    }
+
+    public static final class FastStateDescriptor extends StateDescriptor {
+        private FastStateDescriptor() {
+            super(FastState.class, 484);
+
+            addPredeccessor(Bind2StateDescriptor.class);
+            addSuccessor(Sasl2AuthStateDescriptor.class);
+            declarePrecedenceOver(Sasl2AuthStateDescriptor.class);
+        }
+
+        @Override
+        protected FastModule.FastState constructState(ModularXmppClientToServerConnectionInternal connectionInternal) {
+            FastModule fastModule = connectionInternal.connection.getConnectionModuleFor(FastModuleDescriptor.class);
+            return fastModule.constructFastState(this, connectionInternal);
+        }
+    }
+
+    private static final class FastState extends State {
+
+        private FastState(FastStateDescriptor fastStateDescriptor,
+                        ModularXmppClientToServerConnectionInternal connectionInternal) {
+            super(fastStateDescriptor, connectionInternal);
+        }
+
+        @Override
+        public StateTransitionResult.TransitionImpossible isTransitionToPossible(WalkStateGraphContext walkStateGraphContext) {
+            FastModule fastModule = connectionInternal.connection.getConnectionModuleFor(FastModuleDescriptor.class);
+            if (fastModule == null || !fastModule.isEnabled()) {
+                return new StateTransitionResult.TransitionImpossibleReason("FastModule is disabled or not present");
+            }
+
+            Sasl2Feature sasl2Feature = connectionInternal.connection.getFeature(Sasl2Feature.class);
+            if (sasl2Feature == null) {
+                return new StateTransitionResult.TransitionImpossibleReason("SASL 2 Feature not announced");
+            }
+
+            boolean hasUsableToken = fastModule.hasUsableToken(sasl2Feature);
+            boolean canRequestToken = fastModule.isAutoRequestToken() && sasl2Feature.hasInlineFeature(FastElements.Fast.class);
+            if (!hasUsableToken && !canRequestToken) {
+                return new StateTransitionResult.TransitionImpossibleReason("No usable FAST token nor server FAST token request support");
+            }
+
+            return null;
+        }
+
+        @Override
+        public StateTransitionResult.AttemptResult transitionInto(WalkStateGraphContext walkStateGraphContext) {
+            Sasl2Module sasl2Module = connectionInternal.connection.getConnectionModuleFor(Sasl2ModuleDescriptor.class);
+            if (sasl2Module == null) {
+                return new StateTransitionResult.Failure("SASL 2 module not found on connection");
+            }
+
+            FastModule fastModule = connectionInternal.connection.getConnectionModuleFor(FastModuleDescriptor.class);
+            if (fastModule == null) {
+                return new StateTransitionResult.Failure("FastModule not found on connection");
+            }
+
+            sasl2Module.getAuthenticationContext().addHook(fastModule.getSasl2AuthenticationHook());
+
+            return new StateTransitionResult.Success("FAST configured for SASL2 authentication");
+        }
+    }
+
+    public FastState constructFastState(FastStateDescriptor fastStateDescriptor,
+                    ModularXmppClientToServerConnectionInternal connectionInternal) {
+        return new FastState(fastStateDescriptor, connectionInternal);
+    }
+
 }

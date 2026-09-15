@@ -76,7 +76,7 @@ public final class FastModuleDescriptor extends ModularXmppClientToServerConnect
 
     @Override
     protected Set<Class<? extends StateDescriptor>> getStateDescriptors() {
-        return Collections.emptySet();
+        return Collections.singleton(FastModule.FastStateDescriptor.class);
     }
 
     @Override

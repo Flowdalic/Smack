@@ -166,12 +166,10 @@ public abstract class SaslHtMechanism extends SASLMechanism implements SaslToken
 
     @Override
     protected byte[] getAuthenticationText() throws SmackSaslException {
-        String tokenToUse = this.token != null ? this.token : this.password;
-
-        if (tokenToUse == null) {
+        if (this.token == null) {
             throw new SmackSaslException("No token available for SASL-HT mechanism " + getName());
         }
-        this.token = tokenToUse;
+        String tokenToUse = this.token;
 
         byte[] cbData = getChannelBindingData();
         byte[] tokenBytes = tokenToUse.getBytes(StandardCharsets.UTF_8);

@@ -16,7 +16,6 @@
  */
 package org.jivesoftware.smack.sasl.sasl2;
 
-import java.util.Collections;
 import java.util.Set;
 import java.util.UUID;
 
@@ -61,7 +60,10 @@ public final class Sasl2ModuleDescriptor extends ModularXmppClientToServerConnec
 
     @Override
     protected Set<Class<? extends StateDescriptor>> getStateDescriptors() {
-        return Collections.singleton(Sasl2Module.Sasl2StateDescriptor.class);
+        return org.jivesoftware.smack.util.CollectionUtil.setOf(
+            Sasl2Module.Sasl2InitStateDescriptor.class,
+            Sasl2Module.Sasl2AuthStateDescriptor.class
+        );
     }
 
     @Override

@@ -72,8 +72,16 @@ public class Sasl2Authentication {
         if (hooks != null) {
             this.hooks = new ArrayList<>(hooks);
         } else if (connectionInternal.connection != null) {
-            this.hooks = new ArrayList<>(connectionInternal.connection
+            List<Sasl2AuthenticationHook> detectedHooks = new ArrayList<>();
+            detectedHooks.addAll(connectionInternal.connection
                             .getConnectionModulesImplementing(Sasl2AuthenticationHook.class));
+            for (var supplier : connectionInternal.connection.getConnectionModulesImplementing(Sasl2AuthenticationHookSupplier.class)) {
+                Sasl2AuthenticationHook hook = supplier.getSasl2AuthenticationHook();
+                if (hook != null) {
+                    detectedHooks.add(hook);
+                }
+            }
+            this.hooks = Collections.unmodifiableList(detectedHooks);
         } else {
             this.hooks = Collections.emptyList();
         }
@@ -128,8 +136,8 @@ public class Sasl2Authentication {
 
             if (mech instanceof SaslTokenMechanism) {
                 SaslTokenMechanism tokenMech = (SaslTokenMechanism) mech;
-                if (tokenMech.getToken() == null && !StringUtils.isNotEmpty(password)) {
-                    return "No token or credentials available for " + mech.getName();
+                if (tokenMech.getToken() == null && hooks.isEmpty()) {
+                    return "No token available and no SASL2 authentication hook present to provide a token for " + mech.getName();
                 }
             }
 

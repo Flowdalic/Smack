@@ -935,8 +935,31 @@ public final class ModularXmppClientToServerConnection extends AbstractXMPPConne
 
     public static final class AuthenticatedButUnboundStateDescriptor extends StateDescriptor {
         private AuthenticatedButUnboundStateDescriptor() {
-            super(StateDescriptor.Property.multiVisitState);
+            super(AuthenticatedButUnboundState.class, StateDescriptor.Property.multiVisitState);
             addSuccessor(ResourceBindingStateDescriptor.class);
+        }
+    }
+
+    @SuppressWarnings("ClassCanBeStatic")
+    private final class AuthenticatedButUnboundState extends State {
+        // Invoked via reflection.
+        @SuppressWarnings("UnusedMethod")
+        private AuthenticatedButUnboundState(StateDescriptor stateDescriptor,
+                        ModularXmppClientToServerConnectionInternal connectionInternal) {
+            super(stateDescriptor, connectionInternal);
+        }
+
+        @Override
+        public StateTransitionResult.TransitionImpossible isTransitionToPossible(WalkStateGraphContext walkStateGraphContext) {
+            if (getUser() != null) {
+                return new StateTransitionResult.TransitionImpossibleReason("Resource is already bound");
+            }
+            return null;
+        }
+
+        @Override
+        public StateTransitionResult.Success transitionInto(WalkStateGraphContext walkStateGraphContext) {
+            return StateTransitionResult.Success.EMPTY_INSTANCE;
         }
     }
 
@@ -1012,6 +1035,14 @@ public final class ModularXmppClientToServerConnection extends AbstractXMPPConne
         private AuthenticatedAndResourceBoundState(StateDescriptor stateDescriptor,
                         ModularXmppClientToServerConnectionInternal connectionInternal) {
             super(stateDescriptor, connectionInternal);
+        }
+
+        @Override
+        public StateTransitionResult.TransitionImpossible isTransitionToPossible(WalkStateGraphContext walkStateGraphContext) {
+            if (connectionInternal.connection.getUser() == null) {
+                return new StateTransitionResult.TransitionImpossibleReason("User is not set (resource not bound)");
+            }
+            return null;
         }
 
         @Override
