@@ -18,6 +18,7 @@ package org.jivesoftware.smack.sasl.sasl2;
 
 import java.util.Collections;
 import java.util.Set;
+import java.util.UUID;
 
 import org.jivesoftware.smack.c2s.ModularXmppClientToServerConnectionConfiguration;
 import org.jivesoftware.smack.c2s.ModularXmppClientToServerConnectionModuleDescriptor;
@@ -93,8 +94,8 @@ public final class Sasl2ModuleDescriptor extends ModularXmppClientToServerConnec
         }
 
         public Builder setUserAgent(String id, String software, String device) {
-            this.userAgent = new Sasl2Nonza.UserAgent(id, software, device);
-            return this;
+            var uuid = UUID.fromString(id);
+            return setUserAgent(uuid, software, device);
         }
 
         @Override

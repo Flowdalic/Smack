@@ -27,6 +27,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.UUID;
 
 import org.jivesoftware.smack.bind2.Bind2ModuleDescriptor;
 import org.jivesoftware.smack.bind2.element.Bind2Elements;
@@ -99,24 +100,26 @@ public class Sasl2ElementsTest {
         assertNotNull(parsed.getInlineFeature(Bind2Elements.Bind.class));
     }
 
+    private static final UUID uuid = UUID.randomUUID();
+
     @Test
     public void testAuthenticateSerialization() throws Exception {
-        Sasl2Nonza.UserAgent ua = new Sasl2Nonza.UserAgent("some-uuid", "AwesomeXMPP", "Smartphone");
+        Sasl2Nonza.UserAgent ua = new Sasl2Nonza.UserAgent(uuid, "AwesomeXMPP", "Smartphone");
         Sasl2Nonza.Authenticate auth = new Sasl2Nonza.Authenticate("PLAIN", "initial-data-here", ua, Collections.emptyList());
 
         String xml = auth.toXML(XmlEnvironment.EMPTY).toString();
-        assertXmlSimilar("<authenticate xmlns='urn:xmpp:sasl:2' mechanism='PLAIN'><initial-response>initial-data-here</initial-response><user-agent id='some-uuid'><software>AwesomeXMPP</software><device>Smartphone</device></user-agent></authenticate>", xml);
+        assertXmlSimilar("<authenticate xmlns='urn:xmpp:sasl:2' mechanism='PLAIN'><initial-response>initial-data-here</initial-response><user-agent id='" + uuid + "'><software>AwesomeXMPP</software><device>Smartphone</device></user-agent></authenticate>", xml);
     }
 
     @ParameterizedTest
     @EnumSource(SmackTestUtil.XmlPullParserKind.class)
     public void testAuthenticateWithBind2SerializationAndParsing(SmackTestUtil.XmlPullParserKind parserKind) throws Exception {
-        Sasl2Nonza.UserAgent ua = new Sasl2Nonza.UserAgent("some-uuid", "AwesomeXMPP", null);
+        Sasl2Nonza.UserAgent ua = new Sasl2Nonza.UserAgent(uuid, "AwesomeXMPP", null);
         Bind2Elements.Bind bind = new Bind2Elements.Bind(null, "AwesomeXMPP", Collections.emptyList());
         Sasl2Nonza.Authenticate auth = new Sasl2Nonza.Authenticate("SCRAM-SHA-1", "initial-data", ua, Collections.singletonList(bind));
 
         String xml = auth.toXML(XmlEnvironment.EMPTY).toString();
-        assertXmlSimilar("<authenticate xmlns='urn:xmpp:sasl:2' mechanism='SCRAM-SHA-1'><initial-response>initial-data</initial-response><user-agent id='some-uuid'><software>AwesomeXMPP</software></user-agent><bind xmlns='urn:xmpp:bind:0'><tag>AwesomeXMPP</tag></bind></authenticate>", xml);
+        assertXmlSimilar("<authenticate xmlns='urn:xmpp:sasl:2' mechanism='SCRAM-SHA-1'><initial-response>initial-data</initial-response><user-agent id='" + uuid + "'><software>AwesomeXMPP</software></user-agent><bind xmlns='urn:xmpp:bind:0'><tag>AwesomeXMPP</tag></bind></authenticate>", xml);
 
         XmlPullParser parser = SmackTestUtil.getParserFor(xml, parserKind);
         Sasl2Nonza.Authenticate parsed = Sasl2Provider.AuthenticateProvider.INSTANCE.parse(
@@ -125,7 +128,7 @@ public class Sasl2ElementsTest {
         assertEquals("SCRAM-SHA-1", parsed.getMechanism());
         assertEquals("initial-data", parsed.getInitialResponse());
         assertNotNull(parsed.getUserAgent());
-        assertEquals("some-uuid", parsed.getUserAgent().getId());
+        assertEquals(uuid, parsed.getUserAgent().getId());
         assertEquals("AwesomeXMPP", parsed.getUserAgent().getSoftware());
         assertNull(parsed.getUserAgent().getDevice());
         assertEquals(1, parsed.getExtensionElements().size());

@@ -20,6 +20,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
 import javax.xml.namespace.QName;
 
@@ -49,22 +50,26 @@ public interface Sasl2Nonza extends Nonza {
 
         public static final String DEFAULT_SOFTWARE = "Smack";
 
-        private final String id;
+        /**
+         * A stable identifier for this connection's "client installation", per XEP-0388 § 2.3: "The contents of the
+         * 'id' attribute MUST be a UUID v4."
+         */
+        private final UUID id;
         private final String software;
         private final String device;
 
-        public UserAgent(String id, String software, String device) {
+        public UserAgent(UUID id, String software, String device) {
             this.id = id;
             this.software = software;
             this.device = device;
         }
 
-        public UserAgent(java.util.UUID id, String software, String device) {
-            this(id != null ? id.toString() : null, software, device);
+        public UserAgent(String software, String device) {
+            this(java.util.UUID.randomUUID(), software, device);
         }
 
-        public UserAgent(String software, String device) {
-            this(java.util.UUID.randomUUID().toString(), software, device);
+        public UserAgent(String software) {
+            this(software, null);
         }
 
         @Override
@@ -77,7 +82,7 @@ public interface Sasl2Nonza extends Nonza {
             return NAMESPACE;
         }
 
-        public String getId() {
+        public UUID getId() {
             return id;
         }
 
@@ -92,7 +97,9 @@ public interface Sasl2Nonza extends Nonza {
         @Override
         public XmlStringBuilder toXML(XmlEnvironment xmlEnvironment) {
             XmlStringBuilder xml = new XmlStringBuilder(this, xmlEnvironment);
-            xml.optAttribute("id", id);
+            if (id != null) {
+                xml.attribute("id", id.toString());
+            }
             if (software == null && device == null) {
                 xml.closeEmptyElement();
                 return xml;

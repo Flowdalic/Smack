@@ -783,7 +783,7 @@ public class Sasl2FastAuthenticationTest extends SmackTestSuite {
         assertNotNull(sasl2Module);
         Sasl2Nonza.UserAgent userAgent = sasl2Module.getModuleDescriptor().getUserAgent();
         assertNotNull(userAgent);
-        assertEquals(testUuid.toString(), userAgent.getId());
+        assertEquals(testUuid, userAgent.getId());
         assertEquals("CustomClient", userAgent.getSoftware());
         assertEquals("Desktop", userAgent.getDevice());
 

@@ -21,6 +21,7 @@ import java.text.ParseException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
 import org.jivesoftware.smack.packet.XmlElement;
 import org.jivesoftware.smack.packet.XmlEnvironment;
@@ -147,9 +148,12 @@ public class Sasl2Provider {
 
         private static Sasl2Nonza.UserAgent parseUserAgent(XmlPullParser parser, int initialDepth)
                         throws XmlPullParserException, IOException {
-            String id = parser.getAttributeValue(null, "id");
             String software = null;
             String device = null;
+
+            String idString = parser.getAttributeValue("id");
+            var uuid = UUID.fromString(idString);
+
 
             outerloop: while (true) {
                 XmlPullParser.Event eventType = parser.next();
@@ -170,7 +174,7 @@ public class Sasl2Provider {
                 }
             }
 
-            return new Sasl2Nonza.UserAgent(id, software, device);
+            return new Sasl2Nonza.UserAgent(uuid, software, device);
         }
 
     }
